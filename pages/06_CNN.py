@@ -1,186 +1,300 @@
-"""CNN — Convolutional Network on MNIST/Fashion-MNIST with filter viewer."""
 import time
-
-import matplotlib.pyplot as plt
 import numpy as np
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torchvision import datasets, transforms
+from sklearn.metrics import confusion_matrix
+import plotly.graph_objects as go
 import plotly.express as px
 import streamlit as st
 
-from utils.export import download_code, download_torch
-from utils.nav import render_sidebar
-from utils.theme import apply_theme, hero, metric_row
-from utils.viz import plot_loss_curve, plot_confusion_matrix
-
-st.set_page_config(page_title="CNN", layout="wide", page_icon="⬡")
-apply_theme()
-render_sidebar("CNN")
-
-hero(
-    "CNN",
-    "Train a convolutional network on MNIST or Fashion-MNIST. Visualize feature maps and learned filters.",
-    pill="Lesson 6", pill_variant="purple",
+# ====================== PAGE CONFIG ======================
+st.set_page_config(
+    page_title="CNN — Convolutional Network",
+    layout="wide",
+    page_icon="◫"
 )
+
+# ====================== SAFE CSS ======================
+st.markdown("""
+<style>
+    section[data-testid="stSidebar"] {
+        background: var(--surface) !important;
+        border-right: 1px solid var(--border) !important;
+    }
+    h1, h2, h3, h4 {
+        font-family: 'IBM Plex Sans', 'Helvetica Neue', sans-serif !important;
+        font-weight: 700 !important;
+        letter-spacing: -0.02em !important;
+    }
+    .nn-card {
+        background: var(--surface) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 12px !important;
+        padding: 1.4rem !important;
+        margin-bottom: 1rem !important;
+    }
+    .nn-hero {
+        background: var(--surface) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 16px !important;
+        padding: 2.2rem 2rem !important;
+        margin-bottom: 1.6rem !important;
+    }
+    .nn-pill {
+        display: inline-block;
+        padding: 0.25rem 0.8rem;
+        border-radius: 999px;
+        background: rgba(129, 140, 248, 0.15) !important;
+        color: #818cf8 !important;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+    button[kind="primary"] {
+        background: var(--accent) !important;
+        color: #000 !important;
+        font-weight: 700 !important;
+        border-radius: 8px !important;
+    }
+    hr { border-color: var(--border) !important; }
+</style>
+""", unsafe_allow_html=True)
+
+# ====================== SIDEBAR ======================
+with st.sidebar:
+    st.title("◫ CNN")
+    st.markdown("Convolutional Neural Network")
+    st.markdown("---")
+    st.caption("NeuralForge Ultra v3.0")
+
+# ====================== HERO ======================
+st.markdown("""
+<div class="nn-hero">
+    <div class="nn-pill">Lesson 6</div>
+    <h1>CNN — Convolutional Network</h1>
+    <p style="color: var(--muted); font-size: 1.1rem;">
+        Train a convolutional neural network on MNIST or Fashion-MNIST.<br>
+        Visualize learned filters and feature maps in real time.
+    </p>
+</div>
+""", unsafe_allow_html=True)
 
 with st.expander("📖 Theory", expanded=False):
     st.markdown(r"""
-A **convolution** slides a small filter $f$ over the input $x$:
+A **Convolutional Neural Network (CNN)** uses filters that slide over the image to detect patterns:
 
-$$(f * x)(i,j) = \sum_{m,n} f_{m,n}\,x_{i+m,\,j+n}$$
+$$(f * x)(i,j) = \sum_{m,n} f_{m,n}\, x_{i+m,j+n}$$
 
-**Key operations:**
-- `Conv2d` — learns spatial filters (edges, textures, shapes)
-- `ReLU`   — introduces nonlinearity
-- `MaxPool2d` — down-samples, adds translation invariance
-- `Flatten + Linear` — outputs class logits
+**Key Components:**
+- `Conv2d` → Learns spatial features (edges, textures, shapes)
+- `ReLU` → Non-linearity
+- `MaxPool2d` → Downsampling + translation invariance
+- Fully Connected layers at the end for classification
 
-**Architecture used:** Conv(1→C) → ReLU → MaxPool → Conv(C→2C) → ReLU → MaxPool → FC → 10
+**Architecture:**
+Conv(1→C) → ReLU → MaxPool(2) → Conv(C→2C) → ReLU → MaxPool(2) → Flatten → Linear → 10 classes
 """)
 
-try:
-    import torch
-    import torch.nn as nn
-    from torchvision import datasets, transforms
-    from sklearn.metrics import confusion_matrix as sk_cm
-    TORCH_OK = True
-except ImportError:
-    TORCH_OK = False
-
-if not TORCH_OK:
-    st.error("PyTorch / torchvision not installed.")
-    st.stop()
-
 st.markdown("---")
+
+# ====================== CONTROLS ======================
 col1, col2 = st.columns([1, 2])
 
 with col1:
-    dname   = st.selectbox("Dataset", ["MNIST", "Fashion-MNIST"])
-    epochs  = st.slider("Epochs", 1, 10, 3, 1)
-    lr      = st.slider("Learning rate", 0.0001, 0.01, 0.001, 0.0001, format="%.4f")
-    filters = st.slider("Filters (C)", 8, 64, 16, 8)
-    bs      = st.slider("Batch size", 32, 256, 128, 32)
+    dataset_name = st.selectbox("Dataset", ["MNIST", "Fashion-MNIST"])
+    epochs = st.slider("Epochs", 1, 10, 3, 1)
+    lr = st.slider("Learning Rate", 0.0001, 0.01, 0.001, format="%.4f")
+    num_filters = st.slider("Number of Filters (C)", 8, 64, 16, 8)
+    batch_size = st.slider("Batch Size", 32, 256, 128, 32)
 
 with col2:
     st.markdown("""
     <div class="nn-card">
-      <div style="font-size:0.85rem;color:#8b949e;font-family:'IBM Plex Sans',sans-serif">
-        Architecture:<br>
-        <code>Conv2d(1,C,3) → ReLU → MaxPool(2)<br>
-        Conv2d(C,2C,3) → ReLU → MaxPool(2)<br>
-        Flatten → Linear(2C·7·7, 128) → ReLU → Linear(128,10)</code>
-      </div>
+        <strong>Model Architecture:</strong><br>
+        <code style="font-size:0.85rem;">
+        Conv2d(1, C, 3, padding=1) → ReLU → MaxPool2d(2)<br>
+        Conv2d(C, 2C, 3, padding=1) → ReLU → MaxPool2d(2)<br>
+        Flatten → Linear(2C×7×7, 128) → ReLU → Linear(128, 10)
+        </code>
     </div>
     """, unsafe_allow_html=True)
-    st.info("Click **▶ Train CNN** to load data, train, and view feature maps.")
+    
+    st.info("👈 Adjust parameters and click **Train CNN** below")
 
-train_btn = st.button("▶ Train CNN", type="primary")
+# ====================== TRAINING BUTTON ======================
+train_btn = st.button("▶ Train CNN", type="primary", use_container_width=True)
 
 if train_btn:
-    transform = transforms.Compose([transforms.ToTensor(),
-                                    transforms.Normalize((0.5,), (0.5,))])
-    Cls = datasets.MNIST if dname == "MNIST" else datasets.FashionMNIST
-    train_ds = Cls("./data", train=True,  download=True, transform=transform)
-    test_ds  = Cls("./data", train=False, download=True, transform=transform)
+    # Data loading
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.5,), (0.5,))
+    ])
 
-    train_loader = torch.utils.data.DataLoader(train_ds, batch_size=bs, shuffle=True)
-    test_loader  = torch.utils.data.DataLoader(test_ds,  batch_size=256, shuffle=False)
+    DatasetClass = datasets.MNIST if dataset_name == "MNIST" else datasets.FashionMNIST
+    train_dataset = DatasetClass(root="./data", train=True, download=True, transform=transform)
+    test_dataset = DatasetClass(root="./data", train=False, download=True, transform=transform)
 
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=256, shuffle=False)
+
+    # Model definition
     model = nn.Sequential(
-        nn.Conv2d(1, filters, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
-        nn.Conv2d(filters, filters*2, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+        nn.Conv2d(1, num_filters, kernel_size=3, padding=1),
+        nn.ReLU(),
+        nn.MaxPool2d(2),
+        nn.Conv2d(num_filters, num_filters * 2, kernel_size=3, padding=1),
+        nn.ReLU(),
+        nn.MaxPool2d(2),
         nn.Flatten(),
-        nn.Linear(filters*2*7*7, 128), nn.ReLU(),
-        nn.Linear(128, 10),
+        nn.Linear(num_filters * 2 * 7 * 7, 128),
+        nn.ReLU(),
+        nn.Linear(128, 10)
     )
 
-    opt   = torch.optim.Adam(model.parameters(), lr=lr)
-    crit  = nn.CrossEntropyLoss()
-    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs)
+    optimizer = optim.Adam(model.parameters(), lr=lr)
+    criterion = nn.CrossEntropyLoss()
 
     losses = []
-    bar = st.progress(0)
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+
     total_batches = epochs * len(train_loader)
     batch_count = 0
 
-    for ep in range(epochs):
-        ep_loss = 0.0
-        for xb, yb in train_loader:
-            opt.zero_grad()
-            out = model(xb)
-            loss = crit(out, yb)
-            loss.backward(); opt.step()
-            ep_loss += loss.item()
+    # Training loop
+    for epoch in range(epochs):
+        epoch_loss = 0.0
+        model.train()
+        
+        for images, labels in train_loader:
+            optimizer.zero_grad()
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+
+            epoch_loss += loss.item()
             batch_count += 1
-            bar.progress(int(batch_count / total_batches * 100))
-        sched.step()
-        losses.append(ep_loss / len(train_loader))
+            progress_bar.progress(min(int(batch_count / total_batches * 100), 100))
+
+        avg_loss = epoch_loss / len(train_loader)
+        losses.append(avg_loss)
+        status_text.text(f"Epoch {epoch+1}/{epochs} — Loss: {avg_loss:.4f}")
+
+    st.success(f"✅ Training Complete! Final Loss: {losses[-1]:.4f}")
 
     # Evaluation
+    model.eval()
     all_preds, all_labels = [], []
     with torch.no_grad():
-        for xb, yb in test_loader:
-            all_preds.append(model(xb).argmax(1).numpy())
-            all_labels.append(yb.numpy())
-    all_preds  = np.concatenate(all_preds)
-    all_labels = np.concatenate(all_labels)
-    acc = np.mean(all_preds == all_labels)
+        for images, labels in test_loader:
+            outputs = model(images)
+            preds = outputs.argmax(dim=1)
+            all_preds.extend(preds.numpy())
+            all_labels.extend(labels.numpy())
 
-    st.success(f"✓ Done — Test accuracy: **{acc:.2%}**")
-    metric_row([("Accuracy", f"{acc:.2%}"), ("Final Loss", f"{losses[-1]:.4f}"),
-                ("Filters C", filters), ("Epochs", epochs)])
+    all_preds = np.array(all_preds)
+    all_labels = np.array(all_labels)
+    accuracy = np.mean(all_preds == all_labels)
 
-    st.plotly_chart(plot_loss_curve(losses), use_container_width=True)
+    # Metrics
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Test Accuracy", f"{accuracy:.2%}")
+    c2.metric("Final Loss", f"{losses[-1]:.4f}")
+    c3.metric("Filters", num_filters)
 
-    cm = sk_cm(all_labels, all_preds)
-    labels = list(range(10))
-    if dname == "Fashion-MNIST":
-        labels = ["T-shirt","Trouser","Pullover","Dress","Coat",
-                  "Sandal","Shirt","Sneaker","Bag","Ankle boot"]
-    st.plotly_chart(plot_confusion_matrix(cm, labels), use_container_width=True)
+    # Loss Curve
+    fig_loss = go.Figure()
+    fig_loss.add_trace(go.Scatter(y=losses, mode='lines+markers', 
+                                  line=dict(color='#00d4aa', width=3),
+                                  name='Training Loss'))
+    fig_loss.update_layout(title="Training Loss Curve", height=320,
+                           paper_bgcolor="#161b22", plot_bgcolor="#0d1117",
+                           font=dict(color="#c9d1d9"))
+    st.plotly_chart(fig_loss, use_container_width=True)
 
-    # Feature maps from first conv layer on a sample
-    st.markdown("#### Learned filters — first conv layer")
-    sample, _ = train_ds[0]
+    # Confusion Matrix
+    cm = confusion_matrix(all_labels, all_preds)
+    class_names = list(range(10))
+    if dataset_name == "Fashion-MNIST":
+        class_names = ["T-shirt", "Trouser", "Pullover", "Dress", "Coat",
+                       "Sandal", "Shirt", "Sneaker", "Bag", "Ankle Boot"]
+
+    fig_cm = px.imshow(cm, text_auto=True, color_continuous_scale="Blues",
+                       labels=dict(x="Predicted", y="True Label"),
+                       x=class_names, y=class_names)
+    fig_cm.update_layout(title="Confusion Matrix", height=500)
+    st.plotly_chart(fig_cm, use_container_width=True)
+
+    # ====================== VISUALIZATIONS ======================
+    st.markdown("### 🔍 Feature Maps & Learned Filters")
+
+    # Get one sample
+    sample_img, _ = train_dataset[0]
+    sample_img = sample_img.unsqueeze(0)  # (1, 1, 28, 28)
+
+    # First Conv Layer Feature Maps
     with torch.no_grad():
-        fmaps = model[0](sample.unsqueeze(0))[0].numpy()  # (C, 28, 28)
+        first_conv = model[0](sample_img)  # (1, C, 28, 28)
+        feature_maps = first_conv[0].numpy()  # (C, 28, 28)
 
-    n_show = min(8, filters)
-    fig, axes = plt.subplots(1, n_show, figsize=(n_show * 1.8, 2.2),
-                             facecolor="#0d1117")
-    for i, ax in enumerate(axes):
-        ax.imshow(fmaps[i], cmap="inferno")
-        ax.set_title(f"f{i+1}", color="#8b949e", fontsize=8)
-        ax.axis("off")
-    plt.tight_layout(pad=0.3)
-    st.pyplot(fig)
+    st.markdown("#### Feature Maps from First Convolution Layer")
+    cols = st.columns(8)
+    for i in range(min(8, num_filters)):
+        with cols[i % 8]:
+            fig = px.imshow(feature_maps[i], color_continuous_scale="inferno", 
+                            title=f"Filter {i+1}")
+            fig.update_layout(height=180, margin=dict(l=0,r=0,t=30,b=0))
+            st.plotly_chart(fig, use_container_width=True)
 
-    # First-layer filter weights
-    st.markdown("#### First-layer kernel weights")
-    wts = model[0].weight.detach().numpy()  # (C, 1, 3, 3)
-    fig2, axes2 = plt.subplots(1, n_show, figsize=(n_show * 1.8, 2.2),
-                                facecolor="#0d1117")
-    for i, ax in enumerate(axes2):
-        ax.imshow(wts[i, 0], cmap="RdBu_r", vmin=-wts.max(), vmax=wts.max())
-        ax.set_title(f"k{i+1}", color="#8b949e", fontsize=8)
-        ax.axis("off")
-    plt.tight_layout(pad=0.3)
-    st.pyplot(fig2)
+    # First Layer Kernel Weights
+    st.markdown("#### Learned Kernel Weights (First Conv Layer)")
+    kernels = model[0].weight.detach().numpy()  # (C, 1, 3, 3)
 
-    download_torch("⬇ Download model", model.state_dict(), "cnn_model.pt")
+    cols2 = st.columns(8)
+    for i in range(min(8, num_filters)):
+        with cols2[i % 8]:
+            fig = px.imshow(kernels[i, 0], color_continuous_scale="RdBu_r",
+                            title=f"Kernel {i+1}")
+            fig.update_layout(height=140, margin=dict(l=0,r=0,t=30,b=0))
+            st.plotly_chart(fig, use_container_width=True)
 
-    code = f"""\
-import torch, torch.nn as nn
+    # Download Options
+    st.markdown("---")
+    col_d1, col_d2 = st.columns(2)
+    with col_d1:
+        torch.save(model.state_dict(), "cnn_model.pt")
+        with open("cnn_model.pt", "rb") as f:
+            st.download_button(
+                label="⬇ Download Trained Model (.pt)",
+                data=f,
+                file_name="cnn_model.pt",
+                mime="application/octet-stream"
+            )
+    with col_d2:
+        code_str = f"""import torch
+import torch.nn as nn
 from torchvision import datasets, transforms
 
 transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,),(0.5,))])
-train_ds = datasets.{dname.replace('-','')}('./data', train=True, download=True, transform=transform)
+train_ds = datasets.{dataset_name.replace('-','')}('./data', train=True, download=True, transform=transform)
 
 model = nn.Sequential(
-    nn.Conv2d(1, {filters}, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
-    nn.Conv2d({filters}, {filters*2}, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+    nn.Conv2d(1, {num_filters}, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+    nn.Conv2d({num_filters}, {num_filters*2}, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
     nn.Flatten(),
-    nn.Linear({filters*2}*7*7, 128), nn.ReLU(),
-    nn.Linear(128, 10),
+    nn.Linear({num_filters*2}*7*7, 128), nn.ReLU(),
+    nn.Linear(128, 10)
 )
-opt = torch.optim.Adam(model.parameters(), lr={lr})
 """
-    download_code("⬇ Export Python", code, "cnn.py")
+        st.download_button(
+            label="⬇ Export Model Code",
+            data=code_str,
+            file_name="cnn_model.py",
+            mime="text/plain"
+        )
+
+    st.balloons()
