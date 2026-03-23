@@ -1,149 +1,317 @@
 import time
 import numpy as np
 import pandas as pd
+import plotly.graph_objects as go
 import streamlit as st
-from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.datasets import load_iris, load_wine, load_breast_cancer
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 
-# NOTE: These imports assume your 'utils' folder is present.
-from utils.data import load_iris, load_wine, load_breast_cancer, standardize, csv_to_xy
-from utils.export import download_code, download_pickle, download_torch
-from utils.nav import render_sidebar
-from utils.theme import apply_theme, metric_row
-from utils.viz import plot_loss_curve, plot_accuracy_curve, plot_confusion_matrix, plot_weight_heatmap
+# ====================== PAGE CONFIG ======================
+st.set_page_config(
+    page_title="ANN / MLP — NeuralForge",
+    layout="wide",
+    page_icon="⬛"
+)
 
-# ====================== PAGE CONFIG & CUSTOM CSS ======================
-st.set_page_config(page_title="ANN / MLP — NeuralForge", layout="wide", page_icon="⬡")
-
+# ====================== SAFE CSS ======================
 st.markdown("""
 <style>
-    /* Sidebar & Layout */
-    section[data-testid="stSidebar"] { background: var(--surface) !important; border-right: 1px solid var(--border); }
-    h1, h2, h3, h4 { font-family: 'IBM Plex Sans', sans-serif; font-weight: 700; letter-spacing: -0.02em; color: var(--text); }
-    
-    /* Custom Cards */
-    .nn-card { 
-        background: var(--surface); border: 1px solid var(--border); border-radius: 12px; 
-        padding: 1.4rem; margin-bottom: 1rem; transition: all 0.2s; 
+    section[data-testid="stSidebar"] {
+        background: var(--surface) !important;
+        border-right: 1px solid var(--border) !important;
     }
-    .nn-card:hover { border-color: var(--accent); box-shadow: 0 0 15px color-mix(in srgb, var(--accent) 20%, transparent); }
-    
-    /* Hero Section */
-    .nn-hero { 
-        background: radial-gradient(ellipse 80% 60% at 50% 0%, color-mix(in srgb, var(--accent) 15%, transparent) 0%, transparent 70%), var(--surface); 
-        border: 1px solid var(--border); border-radius: 16px; padding: 2.2rem 2rem; margin-bottom: 1.6rem; 
+    h1, h2, h3, h4 {
+        font-family: 'IBM Plex Sans', 'Helvetica Neue', sans-serif !important;
+        font-weight: 700 !important;
+        letter-spacing: -0.02em !important;
     }
-    
-    /* Pills & Badges */
-    .nn-pill { 
-        display: inline-block; padding: 0.2rem 0.8rem; border-radius: 999px; 
-        background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); 
-        font-size: 0.7rem; font-weight: 700; text-transform: uppercase; margin-bottom: 0.8rem; 
+    .nn-card {
+        background: var(--surface) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 12px !important;
+        padding: 1.4rem !important;
+        margin-bottom: 1rem !important;
     }
-    
-    /* Metrics */
-    [data-testid="stMetric"] { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 0.8rem; }
-    
-    /* Buttons */
-    button[kind="primary"] { 
-        background: var(--accent) !important; color: #000 !important; 
-        font-weight: 700 !important; border-radius: 8px !important; 
-        border: none !important; width: 100%;
+    .nn-hero {
+        background: var(--surface) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 16px !important;
+        padding: 2.2rem 2rem !important;
+        margin-bottom: 1.6rem !important;
     }
+    .nn-pill {
+        display: inline-block;
+        padding: 0.25rem 0.8rem;
+        border-radius: 999px;
+        background: rgba(0, 212, 170, 0.15) !important;
+        color: var(--accent) !important;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+    button[kind="primary"] {
+        background: var(--accent) !important;
+        color: #000 !important;
+        font-weight: 700 !important;
+        border-radius: 8px !important;
+    }
+    hr { border-color: var(--border) !important; }
 </style>
 """, unsafe_allow_html=True)
 
-apply_theme()
-render_sidebar("ANN / MLP")
+# ====================== SIDEBAR ======================
+with st.sidebar:
+    st.title("⬛ ANN / MLP")
+    st.markdown("Multi-Layer Perceptron")
+    st.markdown("---")
+    st.caption("NeuralForge Ultra v3.0")
 
-# ====================== HERO SECTION ======================
-st.markdown(f"""
+# ====================== HERO ======================
+st.markdown("""
 <div class="nn-hero">
     <div class="nn-pill">Lesson 5</div>
     <h1>ANN / MLP — Neural Engine</h1>
-    <p style="color: var(--muted); font-size: 1.1rem;">Build and train a Multi-Layer Perceptron with NumPy or PyTorch backends.</p>
+    <p style="color: var(--muted); font-size: 1.1rem; margin-top: 0.5rem;">
+        Build and train a fully connected neural network with NumPy (from scratch) or PyTorch backend.
+    </p>
 </div>
 """, unsafe_allow_html=True)
 
 with st.expander("📖 Theory & Architecture", expanded=False):
     st.markdown("""
-    MLPs stack **linear layers** and **nonlinear activations**. 
-    Training involves a forward pass to compute error and a backward pass (Backprop) to update weights.
+    A **Multi-Layer Perceptron (MLP)** is a feedforward neural network with one or more hidden layers.
+
+    - **Forward Pass**: Input → Linear → Activation → ... → Output
+    - **Loss**: Cross-Entropy (classification)
+    - **Backward Pass**: Backpropagation + Gradient Descent
+
+    **Activation functions**: ReLU, Tanh, Sigmoid, Leaky ReLU
     """)
-    
 
 st.markdown("---")
 
-# ====================== SIDEBAR / CONTROLS ======================
-col1, col2 = st.columns([1, 2])
+# ====================== CONTROLS ======================
+col_ctrl, col_main = st.columns([1, 2])
 
-with col1:
+with col_ctrl:
     st.markdown('<div class="nn-card">', unsafe_allow_html=True)
-    source   = st.selectbox("Dataset", ["Iris", "Wine", "Breast Cancer", "Upload CSV"])
-    backend  = st.selectbox("Backend", ["NumPy (scratch)", "PyTorch"])
-    act_name = st.selectbox("Activation", ["ReLU", "Tanh", "Sigmoid", "LeakyReLU"])
-    hidden   = st.text_input("Hidden Layers", "64,32", help="Comma separated integers")
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    st.markdown('<div class="nn-card">', unsafe_allow_html=True)
-    epochs   = st.slider("Epochs", 5, 500, 100)
-    lr       = st.slider("Learning Rate", 0.001, 0.1, 0.01, format="%.3f")
-    bs       = st.select_slider("Batch Size", options=[8, 16, 32, 64, 128], value=32)
-    upload   = st.file_uploader("Custom CSV", type=["csv"])
+    source = st.selectbox("Dataset", ["Iris", "Wine", "Breast Cancer", "Upload CSV"])
+    backend = st.selectbox("Backend", ["NumPy (from scratch)", "PyTorch"])
+    activation = st.selectbox("Activation Function", ["ReLU", "Tanh", "Sigmoid", "LeakyReLU"])
+    hidden_input = st.text_input("Hidden Layers (comma separated)", "64,32")
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ====================== DATA PROCESSING ======================
-with col2:
-    if source == "Upload CSV" and upload:
-        X_raw, y_raw = csv_to_xy(upload.getvalue())
-        X_df, y_s = pd.DataFrame(X_raw), pd.Series(y_raw)
+    st.markdown('<div class="nn-card">', unsafe_allow_html=True)
+    epochs = st.slider("Epochs", 10, 500, 100)
+    lr = st.slider("Learning Rate", 0.001, 0.1, 0.01, format="%.4f")
+    batch_size = st.select_slider("Batch Size", options=[8, 16, 32, 64, 128], value=32)
+    upload = st.file_uploader("Upload Custom CSV (features + label)", type=["csv"])
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ====================== DATA LOADING ======================
+with col_main:
+    if source == "Upload CSV" and upload is not None:
+        df = pd.read_csv(upload)
+        X = df.iloc[:, :-1].values.astype(float)
+        y = df.iloc[:, -1].values.astype(int)
     else:
-        loaders = {"Iris": load_iris, "Wine": load_wine, "Breast Cancer": load_breast_cancer}
-        X_df, y_s = loaders.get(source, load_iris)()
+        if source == "Iris":
+            data = load_iris()
+        elif source == "Wine":
+            data = load_wine()
+        else:
+            data = load_breast_cancer()
 
-    X = standardize(X_df.values.astype(float))
-    y = y_s.values.astype(int)
-    n_cls = len(np.unique(y))
+        X = data.data
+        y = data.target
 
-    metric_row([("Samples", len(X)), ("Features", X.shape[1]), ("Classes", n_cls)])
+    # Standardize
+    scaler = StandardScaler()
+    X = scaler.fit_transform(X)
 
-    X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
-    
+    n_classes = len(np.unique(y))
+    n_features = X.shape[1]
+
+    # Show metrics
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Samples", len(X))
+    c2.metric("Features", n_features)
+    c3.metric("Classes", n_classes)
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y
+    )
+
     st.markdown("### Training Workspace")
-    train_btn = st.button("▶ Start Training Engine", type="primary")
+    train_btn = st.button("▶ Start Training Engine", type="primary", use_container_width=True)
 
-# ====================== TRAINING LOGIC ======================
+# ====================== TRAINING ======================
 if train_btn:
-    sizes = [int(s) for s in hidden.split(",") if s.strip().isdigit()]
-    in_d, out_d = X_tr.shape[1], n_cls
-    
-    # Simple NumPy Training Placeholder (matches your previous logic)
-    if backend.startswith("NumPy"):
-        # ... [Keep the NumPy training logic from previous block] ...
-        # (Assuming the logic remains the same as the previous correct version)
-        st.info("Training on NumPy Backend...")
-        time.sleep(1) # Simulate
-        st.success("NumPy Training Mockup Complete.")
-        
+    hidden_sizes = [int(x.strip()) for x in hidden_input.split(",") if x.strip().isdigit()]
+    input_dim = X_train.shape[1]
+    output_dim = n_classes
+
+    losses = []
+    accuracies = []
+
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+
+    if backend == "NumPy (from scratch)":
+        st.info("Training with **NumPy from scratch** (Simple MLP)")
+
+        # Simple NumPy MLP (one hidden layer for speed & stability)
+        np.random.seed(42)
+        h = hidden_sizes[0] if hidden_sizes else 32
+
+        W1 = np.random.randn(input_dim, h) * np.sqrt(2.0 / input_dim)
+        b1 = np.zeros(h)
+        W2 = np.random.randn(h, output_dim) * np.sqrt(2.0 / h)
+        b2 = np.zeros(output_dim)
+
+        for epoch in range(epochs):
+            # Forward
+            z1 = X_train @ W1 + b1
+            a1 = np.maximum(0, z1) if activation == "ReLU" else np.tanh(z1)  # simplified
+            z2 = a1 @ W2 + b2
+            exp_z = np.exp(z2 - np.max(z2, axis=1, keepdims=True))
+            probs = exp_z / exp_z.sum(axis=1, keepdims=True)
+
+            # Loss
+            y_onehot = np.eye(output_dim)[y_train]
+            loss = -np.mean(np.sum(y_onehot * np.log(probs + 1e-8), axis=1))
+            losses.append(loss)
+
+            # Accuracy
+            preds = np.argmax(probs, axis=1)
+            acc = np.mean(preds == y_train)
+            accuracies.append(acc)
+
+            # Backward (simple gradient)
+            dz2 = (probs - y_onehot) / len(X_train)
+            dW2 = a1.T @ dz2
+            db2 = dz2.sum(axis=0)
+            da1 = dz2 @ W2.T
+            dz1 = da1 * (z1 > 0) if activation == "ReLU" else da1 * (1 - np.tanh(z1)**2)
+
+            dW1 = X_train.T @ dz1
+            db1 = dz1.sum(axis=0)
+
+            # Update
+            W1 -= lr * dW1
+            b1 -= lr * db1
+            W2 -= lr * dW2
+            b2 -= lr * db2
+
+            progress_bar.progress((epoch + 1) / epochs)
+            status_text.text(f"Epoch {epoch+1}/{epochs} | Loss: {loss:.4f} | Acc: {acc:.1%}")
+
+        st.success("✅ NumPy Training Completed!")
+
     else:
-        # PyTorch Logic
+        # PyTorch Backend
         import torch
         import torch.nn as nn
-        
-        dims = [in_d] + sizes + [out_d]
-        layers = []
-        for i in range(len(dims)-1):
-            layers.append(nn.Linear(dims[i], dims[i+1]))
-            if i < len(dims)-2: layers.append(nn.ReLU())
-        
-        model = nn.Sequential(*layers)
-        # (Full PyTorch training loop here)
-        st.success("PyTorch Model Ready.")
+        import torch.optim as optim
 
-    # ====================== VISUALIZATION ======================
-    res_c1, res_c2 = st.columns(2)
-    with res_c1:
-        st.markdown('<div class="nn-card">', unsafe_allow_html=True)
-        st.write("Loss Curve")
-        # st.plotly_chart(plot_loss_curve(losses, val_losses))
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.info("Training with **PyTorch** backend")
+
+        class MLP(nn.Module):
+            def __init__(self):
+                super().__init__()
+                layers = []
+                prev = input_dim
+                for h in hidden_sizes:
+                    layers.append(nn.Linear(prev, h))
+                    if activation == "ReLU":
+                        layers.append(nn.ReLU())
+                    elif activation == "Tanh":
+                        layers.append(nn.Tanh())
+                    elif activation == "Sigmoid":
+                        layers.append(nn.Sigmoid())
+                    elif activation == "LeakyReLU":
+                        layers.append(nn.LeakyReLU(0.01))
+                    prev = h
+                layers.append(nn.Linear(prev, output_dim))
+                self.model = nn.Sequential(*layers)
+
+            def forward(self, x):
+                return self.model(x)
+
+        model = MLP()
+        criterion = nn.CrossEntropyLoss()
+        optimizer = optim.Adam(model.parameters(), lr=lr)
+
+        X_tr_t = torch.tensor(X_train, dtype=torch.float32)
+        y_tr_t = torch.tensor(y_train, dtype=torch.long)
+
+        for epoch in range(epochs):
+            optimizer.zero_grad()
+            outputs = model(X_tr_t)
+            loss = criterion(outputs, y_tr_t)
+            loss.backward()
+            optimizer.step()
+
+            losses.append(loss.item())
+            preds = torch.argmax(outputs, dim=1)
+            acc = (preds == y_tr_t).float().mean().item()
+            accuracies.append(acc)
+
+            progress_bar.progress((epoch + 1) / epochs)
+            status_text.text(f"Epoch {epoch+1}/{epochs} | Loss: {loss.item():.4f} | Acc: {acc:.1%}")
+
+        st.success("✅ PyTorch Training Completed!")
+
+    # ====================== RESULTS ======================
+    st.markdown("---")
+
+    # Loss & Accuracy Curves
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(y=losses, name="Loss", line=dict(color="#00d4aa", width=2.5)))
+    fig.add_trace(go.Scatter(y=accuracies, name="Accuracy", line=dict(color="#f97316", width=2.5), yaxis="y2"))
+
+    fig.update_layout(
+        title="Training Progress",
+        height=380,
+        paper_bgcolor="#161b22",
+        plot_bgcolor="#0d1117",
+        font=dict(color="#c9d1d9"),
+        yaxis2=dict(overlaying="y", side="right", tickformat=".0%"),
+        legend=dict(bgcolor="rgba(0,0,0,0)")
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Final Test Evaluation
+    if backend == "NumPy (from scratch)":
+        # NumPy inference
+        z1 = X_test @ W1 + b1
+        a1 = np.maximum(0, z1)
+        z2 = a1 @ W2 + b2
+        probs = np.exp(z2 - np.max(z2, axis=1, keepdims=True))
+        probs /= probs.sum(axis=1, keepdims=True)
+        y_pred = np.argmax(probs, axis=1)
+    else:
+        model.eval()
+        with torch.no_grad():
+            X_te_t = torch.tensor(X_test, dtype=torch.float32)
+            outputs = model(X_te_t)
+            y_pred = torch.argmax(outputs, dim=1).numpy()
+
+    acc_test = np.mean(y_pred == y_test)
+
+    col_res1, col_res2 = st.columns(2)
+    with col_res1:
+        st.metric("Test Accuracy", f"{acc_test:.1%}")
+    with col_res2:
+        st.metric("Final Training Loss", f"{losses[-1]:.4f}")
+
+    st.balloons()
+
+    # Download options
+    st.download_button(
+        "⬇ Download Trained Weights (NumPy)",
+        data=np.savez_compressed("mlp_weights.npz", W1=W1 if 'W1' in locals() else None, 
+                                b1=b1 if 'b1' in locals() else None, W2=W2, b2=b2),
+        file_name="mlp_weights.npz"
+    )
