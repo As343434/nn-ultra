@@ -1,233 +1,331 @@
-"""Autoencoder — unsupervised dimensionality reduction with 2-D latent space."""
-import time
-
-import matplotlib.pyplot as plt
 import numpy as np
-import plotly.graph_objects as go
+import torch
+import torch.nn as nn
+import torch.optim as optim
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
+from sklearn.datasets import load_iris, load_wine
+from sklearn.preprocessing import StandardScaler
 
-from utils.data import load_iris, load_wine, standardize
-from utils.export import download_code, download_torch
-from utils.nav import render_sidebar
-from utils.theme import apply_theme, hero, metric_row
-from utils.viz import plot_loss_curve
-
-st.set_page_config(page_title="Autoencoder", layout="wide", page_icon="⬡")
-apply_theme()
-render_sidebar("Autoencoder")
-
-hero(
-    "Autoencoder",
-    "Unsupervised representation learning — compress data to a 2-D latent space and reconstruct it.",
-    pill="Lesson 8", pill_variant="purple",
+# ====================== PAGE CONFIG ======================
+st.set_page_config(
+    page_title="Autoencoder / VAE",
+    layout="wide",
+    page_icon="◎"
 )
+
+# ====================== SAFE CSS ======================
+st.markdown("""
+<style>
+    section[data-testid="stSidebar"] {
+        background: var(--surface) !important;
+        border-right: 1px solid var(--border) !important;
+    }
+    h1, h2, h3, h4 {
+        font-family: 'IBM Plex Sans', 'Helvetica Neue', sans-serif !important;
+        font-weight: 700 !important;
+        letter-spacing: -0.02em !important;
+    }
+    .nn-card {
+        background: var(--surface) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 12px !important;
+        padding: 1.4rem !important;
+        margin-bottom: 1rem !important;
+    }
+    .nn-hero {
+        background: var(--surface) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 16px !important;
+        padding: 2.2rem 2rem !important;
+        margin-bottom: 1.6rem !important;
+    }
+    .nn-pill {
+        display: inline-block;
+        padding: 0.25rem 0.8rem;
+        border-radius: 999px;
+        background: rgba(129, 140, 248, 0.15) !important;
+        color: #818cf8 !important;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+    button[kind="primary"] {
+        background: var(--accent) !important;
+        color: #000 !important;
+        font-weight: 700 !important;
+        border-radius: 8px !important;
+    }
+    hr { border-color: var(--border) !important; }
+</style>
+""", unsafe_allow_html=True)
+
+# ====================== SIDEBAR ======================
+with st.sidebar:
+    st.title("◎ Autoencoder")
+    st.markdown("Unsupervised Learning")
+    st.markdown("---")
+    st.caption("NeuralForge Ultra v3.0")
+
+# ====================== HERO ======================
+st.markdown("""
+<div class="nn-hero">
+    <div class="nn-pill">Lesson 8</div>
+    <h1>Autoencoder / VAE</h1>
+    <p style="color: var(--muted); font-size: 1.1rem;">
+        Compress data into a low-dimensional latent space and learn to reconstruct it.<br>
+        Visualize the learned 2D manifold without using class labels.
+    </p>
+</div>
+""", unsafe_allow_html=True)
 
 with st.expander("📖 Theory", expanded=False):
     st.markdown(r"""
-An **autoencoder** learns to compress then reconstruct:
+An **Autoencoder** learns compression and reconstruction:
 
 $$z = \text{Encoder}(x) \quad \hat{x} = \text{Decoder}(z)$$
 
-Trained to minimize **reconstruction loss**:
-
+Trained with **reconstruction loss**:
 $$L = \|x - \hat{x}\|^2$$
 
-With a **2-D bottleneck** we can visualise the learned manifold.
-Applications include anomaly detection, denoising, and pre-training.
+**Variational Autoencoder (VAE)** adds regularization:
+$$L_{VAE} = \|x - \hat{x}\|^2 + \beta \, D_{KL}(q(z|x) \parallel \mathcal{N}(0,I))$$
 
-**Variational Autoencoder (VAE)** adds a KL-divergence term to regularise the latent space:
-
-$$L_{\text{VAE}} = \|x - \hat{x}\|^2 + \beta\,D_{KL}(q(z|x)\,\|\,\mathcal{N}(0,I))$$
+A **2D latent space** lets us visualize how the model organizes data **unsupervised**.
 """)
 
-try:
-    import torch, torch.nn as nn
-    TORCH_OK = True
-except ImportError:
-    TORCH_OK = False
-
-if not TORCH_OK:
-    st.error("PyTorch not installed."); st.stop()
-
 st.markdown("---")
+
+# ====================== CONTROLS ======================
 col1, col2 = st.columns([1, 2])
 
 with col1:
-    source    = st.selectbox("Dataset", ["Iris", "Wine"])
-    model_t   = st.selectbox("Model type", ["Autoencoder", "VAE"])
-    enc_arch  = st.text_input("Encoder hidden sizes", "32,16")
-    latent_d  = st.slider("Latent dimension", 2, 8, 2, 1)
-    epochs    = st.slider("Epochs", 20, 500, 150, 20)
-    lr        = st.slider("Learning rate", 0.0005, 0.05, 0.005, 0.0005, format="%.4f")
-    beta_kl   = st.slider("β (KL weight, VAE only)", 0.0, 5.0, 1.0, 0.1,
-                          disabled=(model_t != "VAE"))
-    noise_lvl = st.slider("Input noise (denoising)", 0.0, 0.5, 0.0, 0.05)
+    dataset_name = st.selectbox("Dataset", ["Iris", "Wine"])
+    model_type = st.selectbox("Model Type", ["Autoencoder", "VAE"])
+    enc_arch = st.text_input("Encoder Hidden Layers", "32,16")
+    latent_dim = st.slider("Latent Dimension", 2, 8, 2)
+    epochs = st.slider("Epochs", 20, 500, 150, 20)
+    lr = st.slider("Learning Rate", 0.0005, 0.05, 0.005, format="%.4f")
+    
+    if model_type == "VAE":
+        beta_kl = st.slider("β (KL Divergence Weight)", 0.0, 5.0, 1.0, 0.1)
+    else:
+        beta_kl = 0.0
+    
+    noise_level = st.slider("Denoising Noise Level", 0.0, 0.5, 0.0, 0.05)
 
 with col2:
-    if source == "Iris":
-        X_df, y_s = load_iris()
+    # Load data
+    if dataset_name == "Iris":
+        data = load_iris()
     else:
-        X_df, y_s = load_wine()
+        data = load_wine()
+    
+    X = data.data.astype(np.float32)
+    y = data.target.astype(int)
+    
+    # Standardize
+    scaler = StandardScaler()
+    X = scaler.fit_transform(X)
+    
+    # Metrics
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Samples", len(X))
+    c2.metric("Features", X.shape[1])
+    c3.metric("Classes", len(np.unique(y)))
+    
+    st.info("The model learns a compressed representation **without using class labels**.")
 
-    X = standardize(X_df.values.astype(float)).astype(np.float32)
-    y = y_s.values.astype(int)
-
-    metric_row([
-        ("Samples",   len(X)),
-        ("Features",  X.shape[1]),
-        ("Classes",   len(np.unique(y))),
-        ("Latent dim", latent_d),
-    ])
-    st.info("The encoder maps each sample to the 2-D (or N-D) latent space. "
-            "The scatter plot shows class clusters that emerge **without labels**.")
-
-train_btn = st.button("▶ Train Autoencoder", type="primary")
+# ====================== TRAINING ======================
+train_btn = st.button("▶ Train Autoencoder", type="primary", use_container_width=True)
 
 if train_btn:
     torch.manual_seed(42)
-    in_d = X.shape[1]
-    enc_sizes = [int(s) for s in enc_arch.split(",") if s.strip().isdigit()]
-
-    # ── Build encoder / decoder ────────────────────────────────────────
-    def make_mlp(dims, act=nn.ReLU):
+    X_t = torch.from_numpy(X)
+    input_dim = X.shape[1]
+    
+    # Parse encoder architecture
+    hidden_sizes = [int(x.strip()) for x in enc_arch.split(",") if x.strip().isdigit()]
+    
+    # Build MLP helper
+    def make_mlp(dims):
         layers = []
-        for i in range(len(dims) - 1):
+        for i in range(len(dims)-1):
             layers.append(nn.Linear(dims[i], dims[i+1]))
-            if i < len(dims) - 2:
-                layers.append(act())
+            if i < len(dims)-2:
+                layers.append(nn.ReLU())
         return nn.Sequential(*layers)
-
-    if model_t == "Autoencoder":
-        enc = make_mlp([in_d] + enc_sizes + [latent_d])
-        dec = make_mlp([latent_d] + enc_sizes[::-1] + [in_d])
-
-        class AE(nn.Module):
-            def __init__(self): super().__init__(); self.enc = enc; self.dec = dec
-            def forward(self, x): z = self.enc(x); return self.dec(z), z, None, None
-
-    else:  # VAE
-        enc_body = make_mlp([in_d] + enc_sizes)
-        mu_layer  = nn.Linear(enc_sizes[-1] if enc_sizes else in_d, latent_d)
-        lv_layer  = nn.Linear(enc_sizes[-1] if enc_sizes else in_d, latent_d)
-        dec = make_mlp([latent_d] + enc_sizes[::-1] + [in_d])
-
+    
+    if model_type == "Autoencoder":
+        encoder = make_mlp([input_dim] + hidden_sizes + [latent_dim])
+        decoder = make_mlp([latent_dim] + hidden_sizes[::-1] + [input_dim])
+        
         class AE(nn.Module):
             def __init__(self):
                 super().__init__()
-                self.enc_body = enc_body
-                self.mu_l  = mu_layer
-                self.lv_l  = lv_layer
-                self.dec   = dec
+                self.encoder = encoder
+                self.decoder = decoder
             def forward(self, x):
-                h  = self.enc_body(x)
-                mu = self.mu_l(h); lv = self.lv_l(h)
-                z  = mu + torch.randn_like(mu) * (0.5 * lv).exp()
-                return self.dec(z), z, mu, lv
-
+                z = self.encoder(x)
+                x_hat = self.decoder(z)
+                return x_hat, z, None, None
+    else:  # VAE
+        encoder_body = make_mlp([input_dim] + hidden_sizes)
+        mu_layer = nn.Linear(hidden_sizes[-1] if hidden_sizes else input_dim, latent_dim)
+        logvar_layer = nn.Linear(hidden_sizes[-1] if hidden_sizes else input_dim, latent_dim)
+        decoder = make_mlp([latent_dim] + hidden_sizes[::-1] + [input_dim])
+        
+        class AE(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.encoder_body = encoder_body
+                self.mu_layer = mu_layer
+                self.logvar_layer = logvar_layer
+                self.decoder = decoder
+            def forward(self, x):
+                h = self.encoder_body(x)
+                mu = self.mu_layer(h)
+                logvar = self.logvar_layer(h)
+                std = torch.exp(0.5 * logvar)
+                eps = torch.randn_like(std)
+                z = mu + eps * std
+                x_hat = self.decoder(z)
+                return x_hat, z, mu, logvar
+    
     model = AE()
-    opt   = torch.optim.Adam(model.parameters(), lr=lr)
-    X_t   = torch.from_numpy(X)
-
-    losses, recon_losses, kl_losses = [], [], []
-    bar = st.progress(0)
-
-    for ep in range(epochs):
-        # Add noise for denoising AE
-        X_noisy = X_t + noise_lvl * torch.randn_like(X_t) if noise_lvl > 0 else X_t
-        opt.zero_grad()
-        x_hat, z, mu, lv = model(X_noisy)
-        recon = nn.MSELoss()(x_hat, X_t)
-        if model_t == "VAE" and mu is not None:
-            kl = -0.5 * torch.mean(1 + lv - mu**2 - lv.exp())
-            loss = recon + beta_kl * kl
-            kl_losses.append(kl.item())
+    optimizer = optim.Adam(model.parameters(), lr=lr)
+    
+    losses = []
+    recon_losses = []
+    kl_losses = []
+    
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    for epoch in range(epochs):
+        optimizer.zero_grad()
+        
+        # Add noise for denoising
+        X_input = X_t + noise_level * torch.randn_like(X_t) if noise_level > 0 else X_t
+        
+        x_hat, z, mu, logvar = model(X_input)
+        
+        recon_loss = nn.MSELoss()(x_hat, X_t)
+        
+        if model_type == "VAE" and mu is not None:
+            kl_loss = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
+            loss = recon_loss + beta_kl * kl_loss
+            kl_losses.append(kl_loss.item())
         else:
-            loss = recon
+            loss = recon_loss
             kl_losses.append(0.0)
-        loss.backward(); opt.step()
+        
+        loss.backward()
+        optimizer.step()
+        
         losses.append(loss.item())
-        recon_losses.append(recon.item())
-        bar.progress(int((ep+1)/epochs*100))
-        time.sleep(0.005)
+        recon_losses.append(recon_loss.item())
+        
+        progress_bar.progress((epoch + 1) / epochs)
+        status_text.text(f"Epoch {epoch+1}/{epochs} | Loss: {loss.item():.5f}")
+    
+    st.success(f"✅ Training Complete! Final Reconstruction Loss: **{recon_losses[-1]:.5f}**")
 
-    st.success(f"✓ Done — final reconstruction loss: **{recon_losses[-1]:.5f}**")
+    # Loss Curves
+    fig_loss = go.Figure()
+    fig_loss.add_trace(go.Scatter(y=recon_losses, name="Reconstruction Loss", line=dict(color="#00d4aa")))
+    if model_type == "VAE":
+        fig_loss.add_trace(go.Scatter(y=kl_losses, name="KL Divergence", line=dict(color="#f97316")))
+    fig_loss.update_layout(title="Training Losses", height=340, paper_bgcolor="#161b22", plot_bgcolor="#0d1117")
+    st.plotly_chart(fig_loss, use_container_width=True)
 
-    c1, c2 = st.columns(2)
-    with c1:
-        st.plotly_chart(plot_loss_curve(losses), use_container_width=True)
-    with c2:
-        if model_t == "VAE":
-            fig_kl = go.Figure()
-            fig_kl.add_trace(go.Scatter(y=kl_losses, mode="lines",
-                                        line=dict(color="#f97316", width=2)))
-            fig_kl.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#0d1117",
-                                 font=dict(color="#8b949e"), height=300,
-                                 margin=dict(l=10,r=10,t=30,b=10),
-                                 title=dict(text="KL Loss", font=dict(color="#e6edf3")))
-            st.plotly_chart(fig_kl, use_container_width=True)
-        else:
-            metric_row([("Final loss", f"{losses[-1]:.5f}"),
-                        ("Recon loss", f"{recon_losses[-1]:.5f}")])
-
-    # ── Latent space scatter ────────────────────────────────────────────
-    st.markdown("#### Latent space (first 2 dims)")
+    # Latent Space Visualization
+    st.markdown("#### 2D Latent Space Visualization")
     with torch.no_grad():
         _, z_all, mu_all, _ = model(X_t)
         z_np = (mu_all if mu_all is not None else z_all).numpy()
-
-    fig_z = px.scatter(
-        x=z_np[:, 0], y=z_np[:, 1] if latent_d > 1 else np.zeros(len(z_np)),
+    
+    # Always show 2D (take first two dimensions if latent > 2)
+    if z_np.shape[1] > 2:
+        z_plot = z_np[:, :2]
+    else:
+        z_plot = z_np
+    
+    fig_latent = px.scatter(
+        x=z_plot[:, 0], y=z_plot[:, 1] if z_plot.shape[1] > 1 else np.zeros(len(z_plot)),
         color=y.astype(str),
-        color_discrete_sequence=["#00d4aa", "#f97316", "#818cf8", "#f85149", "#3fb950"],
-        template="plotly_dark",
-        labels={"x": "z₁", "y": "z₂", "color": "class"},
-        title=f"Latent space — {source}",
+        color_discrete_sequence=["#00d4aa", "#f97316", "#818cf8", "#f85149"],
+        title=f"Latent Space ({model_type}) — Colored by True Class",
+        labels={"x": "z₁", "y": "z₂", "color": "Class"}
     )
-    fig_z.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#0d1117",
-                        font=dict(color="#8b949e"), height=380)
-    st.plotly_chart(fig_z, use_container_width=True)
+    fig_latent.update_layout(height=420, paper_bgcolor="#161b22", plot_bgcolor="#0d1117")
+    st.plotly_chart(fig_latent, use_container_width=True)
 
-    # ── Reconstruction quality ──────────────────────────────────────────
-    st.markdown("#### Reconstruction quality — first 6 samples")
+    # Reconstruction Quality
+    st.markdown("#### Reconstruction Quality — First 8 Samples")
     with torch.no_grad():
         x_hat_np = model(X_t)[0].numpy()
+    
+    # Create bar plots for reconstruction
+    cols = st.columns(4)
+    for i in range(8):
+        with cols[i % 4]:
+            fig = go.Figure()
+            fig.add_trace(go.Bar(x=list(range(input_dim)), y=X[i], name="Original", marker_color="#00d4aa"))
+            fig.add_trace(go.Bar(x=list(range(input_dim)), y=x_hat_np[i], name="Reconstructed", marker_color="#f97316"))
+            fig.update_layout(
+                title=f"Sample {i+1}",
+                height=280,
+                barmode='group',
+                paper_bgcolor="#161b22",
+                plot_bgcolor="#0d1117",
+                font=dict(color="#c9d1d9"),
+                margin=dict(l=10, r=10, t=40, b=10)
+            )
+            st.plotly_chart(fig, use_container_width=True)
 
-    fig_rc, axes = plt.subplots(2, 6, figsize=(12, 3.5), facecolor="#0d1117")
-    for i in range(6):
-        ax_o, ax_r = axes[0, i], axes[1, i]
-        ax_o.bar(range(in_d), X[i],      color="#00d4aa", width=0.8)
-        ax_r.bar(range(in_d), x_hat_np[i], color="#f97316", width=0.8)
-        for ax in (ax_o, ax_r):
-            ax.set_facecolor("#0d1117"); ax.tick_params(colors="#8b949e", labelsize=6)
-            for sp in ax.spines.values(): sp.set_edgecolor("rgba(255,255,255,0.08)")
-        if i == 0:
-            ax_o.set_ylabel("Original", color="#8b949e", fontsize=8)
-            ax_r.set_ylabel("Reconstructed", color="#8b949e", fontsize=8)
-    plt.suptitle("Feature-wise reconstruction", color="#e6edf3", fontsize=10)
-    plt.tight_layout(pad=0.4)
-    st.pyplot(fig_rc)
+    # Download Options
+    st.markdown("---")
+    col_d1, col_d2 = st.columns(2)
+    with col_d1:
+        torch.save(model.state_dict(), "autoencoder.pt")
+        with open("autoencoder.pt", "rb") as f:
+            st.download_button(
+                label="⬇ Download Trained Model",
+                data=f,
+                file_name="autoencoder.pt",
+                mime="application/octet-stream"
+            )
+    
+    with col_d2:
+        code_str = f"""import torch
+import torch.nn as nn
 
-    download_torch("⬇ Download model", model.state_dict(), "autoencoder.pt")
+# Simple Autoencoder / VAE skeleton
+class Autoencoder(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.encoder = nn.Sequential(
+            nn.Linear({input_dim}, {hidden_sizes[0] if hidden_sizes else latent_dim}), nn.ReLU(),
+            nn.Linear({hidden_sizes[0] if hidden_sizes else latent_dim}, {latent_dim})
+        )
+        self.decoder = nn.Sequential(
+            nn.Linear({latent_dim}, {hidden_sizes[0] if hidden_sizes else input_dim}), nn.ReLU(),
+            nn.Linear({hidden_sizes[0] if hidden_sizes else input_dim}, {input_dim})
+        )
+    
+    def forward(self, x):
+        z = self.encoder(x)
+        return self.decoder(z), z
 
-    code = f"""\
-import torch, torch.nn as nn
-
-# {model_t} — latent_dim={latent_d}
-enc = nn.Sequential(
-    nn.Linear({in_d}, {enc_sizes[0] if enc_sizes else latent_d}), nn.ReLU(),
-    nn.Linear({enc_sizes[0] if enc_sizes else latent_d}, {latent_d}),
-)
-dec = nn.Sequential(
-    nn.Linear({latent_d}, {enc_sizes[0] if enc_sizes else in_d}), nn.ReLU(),
-    nn.Linear({enc_sizes[0] if enc_sizes else in_d}, {in_d}),
-)
-
-opt = torch.optim.Adam(list(enc.parameters())+list(dec.parameters()), lr={lr})
-for epoch in range({epochs}):
-    z    = enc(X_t)
-    xhat = dec(z)
-    loss = nn.MSELoss()(xhat, X_t)
-    loss.backward(); opt.step(); opt.zero_grad()
+model = Autoencoder()
 """
-    download_code("⬇ Export Python", code, "autoencoder.py")
+        st.download_button(
+            label="⬇ Export Model Code",
+            data=code_str,
+            file_name="autoencoder.py",
+            mime="text/plain"
+        )
+
+    st.balloons()
