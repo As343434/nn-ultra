@@ -1,8 +1,11 @@
 """Data loaders and preprocessing utilities."""
+import io
 import numpy as np
 import pandas as pd
 from sklearn.datasets import (
-    load_iris, load_wine, load_breast_cancer,
+    load_iris as _load_iris,
+    load_wine as _load_wine,
+    load_breast_cancer as _load_breast_cancer,
     make_moons, make_circles, make_blobs,
     make_classification,
 )
@@ -13,19 +16,47 @@ def standardize(X):
     return StandardScaler().fit_transform(X)
 
 
+# ── Named loaders returning (X_df, y_series) as pages expect ─────────────────
+def load_iris():
+    d = _load_iris()
+    return pd.DataFrame(d.data, columns=d.feature_names), pd.Series(d.target)
+
+
+def load_wine():
+    d = _load_wine()
+    return pd.DataFrame(d.data, columns=d.feature_names), pd.Series(d.target)
+
+
+def load_breast_cancer():
+    d = _load_breast_cancer()
+    return pd.DataFrame(d.data, columns=d.feature_names), pd.Series(d.target)
+
+
+def csv_to_xy(raw_bytes):
+    """Accept raw bytes (from upload.getvalue()) or a DataFrame."""
+    if isinstance(raw_bytes, (bytes, bytearray)):
+        df = pd.read_csv(io.BytesIO(raw_bytes))
+    else:
+        df = pd.DataFrame(raw_bytes)
+    y = df.iloc[:, -1].values
+    X = df.iloc[:, :-1].select_dtypes(include=np.number).values
+    return X, y
+
+
+# ── Raw numpy loaders ─────────────────────────────────────────────────────────
 def load_iris_data():
-    d = load_iris()
-    return standardize(d.data), d.target, d.feature_names, d.target_names
+    d = _load_iris()
+    return standardize(d.data), d.target, list(d.feature_names), list(d.target_names)
 
 
 def load_wine_data():
-    d = load_wine()
-    return standardize(d.data), d.target, d.feature_names, d.target_names
+    d = _load_wine()
+    return standardize(d.data), d.target, list(d.feature_names), list(d.target_names)
 
 
 def load_breast_cancer_data():
-    d = load_breast_cancer()
-    return standardize(d.data), d.target, d.feature_names, d.target_names
+    d = _load_breast_cancer()
+    return standardize(d.data), d.target, list(d.feature_names), list(d.target_names)
 
 
 def load_moons(n=300, noise=0.15):
@@ -45,12 +76,6 @@ def load_blobs(n=300, centers=3):
 
 def load_classification(n=500, features=10, classes=3):
     X, y = make_classification(n_samples=n, n_features=features,
-                                n_classes=classes, n_informative=features//2,
+                                n_classes=classes, n_informative=features // 2,
                                 random_state=42)
-    return standardize(X), y
-
-
-def csv_to_xy(df: pd.DataFrame, target_col: str):
-    y = df[target_col].values
-    X = df.drop(columns=[target_col]).select_dtypes(include=np.number).values
     return standardize(X), y
