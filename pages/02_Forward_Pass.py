@@ -129,3 +129,94 @@ z = W @ x + b   # linear step
 # result a = {a.tolist()}
 """
     download_code("⬇ Export Python", python_export, "forward_pass.py")
+
+import streamlit as st
+
+def apply_custom_css():
+    st.markdown(
+        """
+        <style>
+        /* Sidebar styling */
+        section[data-testid="stSidebar"] { 
+            background: var(--surface) !important; 
+            border-right: 1px solid var(--border); 
+        }
+        
+        /* Typography */
+        h1, h2, h3, h4 { 
+            font-family: 'IBM Plex Sans', 'Helvetica Neue', sans-serif; 
+            font-weight: 700; 
+            letter-spacing: -0.02em; 
+            color: var(--text); 
+        }
+        
+        /* Custom UI Cards */
+        .nn-card { 
+            background: var(--surface); 
+            border: 1px solid var(--border); 
+            border-radius: var(--radius-lg); 
+            padding: 1.4rem; 
+            margin-bottom: 1rem; 
+            box-shadow: var(--card-shadow); 
+            transition: border-color 0.2s, box-shadow 0.2s; 
+        } 
+        .nn-card:hover { border-color: var(--accent); box-shadow: var(--glow); }
+        
+        .nn-card-accent { 
+            background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 8%, transparent) 0%, color-mix(in srgb, var(--accent3) 6%, transparent) 50%, color-mix(in srgb, var(--accent2) 5%, transparent) 100%); 
+            border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); 
+            border-radius: var(--radius-lg); padding: 1.4rem; margin-bottom: 1rem; 
+        }
+        
+        .nn-hero { 
+            background: radial-gradient(ellipse 80% 60% at 50% 0%, color-mix(in srgb, var(--accent) 15%, transparent) 0%, color-mix(in srgb, var(--accent3) 8%, transparent) 40%, transparent 70%), var(--surface); 
+            border: 1px solid var(--border); border-radius: var(--radius-lg); 
+            padding: 2.2rem 2rem; margin-bottom: 1.6rem; position: relative; overflow: hidden; 
+        }
+        
+        /* Pills and Badges */
+        .nn-pill { 
+            display: inline-block; padding: 0.25rem 0.75rem; border-radius: 999px; 
+            background: color-mix(in srgb, var(--accent) 15%, transparent); 
+            color: var(--accent); font-size: 0.75rem; font-weight: 700; 
+            letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 0.6rem; 
+        } 
+        .nn-pill-orange { background: color-mix(in srgb, var(--accent2) 15%, transparent); color: var(--accent2); } 
+        .nn-pill-purple { background: color-mix(in srgb, var(--accent3) 15%, transparent); color: var(--accent3); }
+        
+        /* Metrics and Status */
+        .nn-metric { 
+            background: var(--surface2); border: 1px solid var(--border); 
+            border-radius: var(--radius); padding: 1rem 1.2rem; text-align: center; 
+            transition: box-shadow 0.2s; 
+        } 
+        .nn-metric:hover { box-shadow: var(--glow); } 
+        .nn-metric-value { font-size: 1.8rem; font-weight: 800; color: var(--accent); font-family: 'IBM Plex Sans', sans-serif; } 
+        .nn-metric-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 0.2rem; }
+        
+        .status-badge { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.72rem; font-weight: 600; } 
+        .status-running { background: color-mix(in srgb, var(--accent2) 20%, transparent); color: var(--accent2); } 
+        .status-done { background: color-mix(in srgb, var(--success) 20%, transparent); color: var(--success); } 
+        .status-idle { background: color-mix(in srgb, var(--muted) 20%, transparent); color: var(--muted); }
+        
+        /* Global Overrides */
+        [data-testid="stMetric"] { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.8rem 1rem; } 
+        [data-testid="stMetricValue"] { color: var(--accent) !important; }
+        div[data-testid="stExpander"] > details { background: var(--surface) !important; border: 1px solid var(--border) !important; border-radius: var(--radius) !important; }
+        
+        button[kind="primary"] { 
+            background: var(--accent) !important; color: #000 !important; 
+            font-weight: 700 !important; border-radius: 8px !important; 
+            box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 40%, transparent) !important; 
+        } 
+        button[kind="secondary"] { border: 1px solid var(--accent) !important; color: var(--accent) !important; border-radius: 8px !important; }
+        
+        [data-testid="stProgress"] > div > div { background: var(--accent) !important; }
+        hr { border-color: var(--border) !important; margin: 1.5rem 0 !important; }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+# Call the function in your app
+apply_custom_css()
