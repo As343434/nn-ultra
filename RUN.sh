@@ -1,0 +1,1 @@
+/opt/anaconda3/bin/conda run -n neuralforge streamlit run app.py
