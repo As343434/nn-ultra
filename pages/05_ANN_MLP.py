@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
+import io
 from sklearn.datasets import load_iris, load_wine, load_breast_cancer
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
@@ -81,11 +82,9 @@ st.markdown("""
 with st.expander("📖 Theory & Architecture", expanded=False):
     st.markdown("""
     A **Multi-Layer Perceptron (MLP)** is a feedforward neural network with one or more hidden layers.
-
     - **Forward Pass**: Input → Linear → Activation → ... → Output
     - **Loss**: Cross-Entropy (classification)
     - **Backward Pass**: Backpropagation + Gradient Descent
-
     **Activation functions**: ReLU, Tanh, Sigmoid, Leaky ReLU
     """)
 
@@ -122,18 +121,14 @@ with col_main:
             data = load_wine()
         else:
             data = load_breast_cancer()
-
         X = data.data
         y = data.target
 
-    # Standardize
     scaler = StandardScaler()
     X = scaler.fit_transform(X)
-
     n_classes = len(np.unique(y))
     n_features = X.shape[1]
 
-    # Show metrics
     c1, c2, c3 = st.columns(3)
     c1.metric("Samples", len(X))
     c2.metric("Features", n_features)
@@ -154,14 +149,11 @@ if train_btn:
 
     losses = []
     accuracies = []
-
     progress_bar = st.progress(0)
     status_text = st.empty()
 
     if backend == "NumPy (from scratch)":
-        st.info("Training with **NumPy from scratch** (Simple MLP)")
-
-        # Simple NumPy MLP (one hidden layer for speed & stability)
+        st.info("Training with **NumPy from scratch**")
         np.random.seed(42)
         h = hidden_sizes[0] if hidden_sizes else 32
 
@@ -171,34 +163,28 @@ if train_btn:
         b2 = np.zeros(output_dim)
 
         for epoch in range(epochs):
-            # Forward
             z1 = X_train @ W1 + b1
-            a1 = np.maximum(0, z1) if activation == "ReLU" else np.tanh(z1)  # simplified
+            a1 = np.maximum(0, z1) if activation == "ReLU" else np.tanh(z1)
             z2 = a1 @ W2 + b2
-            exp_z = np.exp(z2 - np.max(z2, axis=1, keepdims=True))
-            probs = exp_z / exp_z.sum(axis=1, keepdims=True)
+            ex = np.exp(z2 - np.max(z2, axis=1, keepdims=True))
+            probs = ex / ex.sum(axis=1, keepdims=True)
 
-            # Loss
             y_onehot = np.eye(output_dim)[y_train]
             loss = -np.mean(np.sum(y_onehot * np.log(probs + 1e-8), axis=1))
             losses.append(loss)
 
-            # Accuracy
             preds = np.argmax(probs, axis=1)
             acc = np.mean(preds == y_train)
             accuracies.append(acc)
 
-            # Backward (simple gradient)
             dz2 = (probs - y_onehot) / len(X_train)
             dW2 = a1.T @ dz2
             db2 = dz2.sum(axis=0)
             da1 = dz2 @ W2.T
             dz1 = da1 * (z1 > 0) if activation == "ReLU" else da1 * (1 - np.tanh(z1)**2)
-
             dW1 = X_train.T @ dz1
             db1 = dz1.sum(axis=0)
 
-            # Update
             W1 -= lr * dW1
             b1 -= lr * db1
             W2 -= lr * dW2
@@ -266,11 +252,9 @@ if train_btn:
     # ====================== RESULTS ======================
     st.markdown("---")
 
-    # Loss & Accuracy Curves
     fig = go.Figure()
     fig.add_trace(go.Scatter(y=losses, name="Loss", line=dict(color="#00d4aa", width=2.5)))
     fig.add_trace(go.Scatter(y=accuracies, name="Accuracy", line=dict(color="#f97316", width=2.5), yaxis="y2"))
-
     fig.update_layout(
         title="Training Progress",
         height=380,
@@ -284,7 +268,6 @@ if train_btn:
 
     # Final Test Evaluation
     if backend == "NumPy (from scratch)":
-        # NumPy inference
         z1 = X_test @ W1 + b1
         a1 = np.maximum(0, z1)
         z2 = a1 @ W2 + b2
@@ -306,12 +289,32 @@ if train_btn:
     with col_res2:
         st.metric("Final Training Loss", f"{losses[-1]:.4f}")
 
-    st.balloons()
+    # ====================== DOWNLOAD (FIXED) ======================
+    st.markdown("---")
+    if backend == "NumPy (from scratch)":
+        # Save NumPy weights to .npz
+        buffer = io.BytesIO()
+        np.savez_compressed(buffer, W1=W1, b1=b1, W2=W2, b2=b2)
+        buffer.seek(0)
 
-    # Download options
-    st.download_button(
-        "⬇ Download Trained Weights (NumPy)",
-        data=np.savez_compressed("mlp_weights.npz", W1=W1 if 'W1' in locals() else None, 
-                                b1=b1 if 'b1' in locals() else None, W2=W2, b2=b2),
-        file_name="mlp_weights.npz"
-    )
+        st.download_button(
+            label="⬇ Download Trained Weights (NumPy .npz)",
+            data=buffer,
+            file_name="mlp_weights.npz",
+            mime="application/octet-stream"
+        )
+    else:
+        # PyTorch weights
+        buffer = io.BytesIO()
+        torch.save(model.state_dict(), buffer)
+        buffer.seek(0)
+
+        st.download_button(
+            label="⬇ Download Trained Model (PyTorch .pt)",
+            data=buffer,
+            file_name="mlp_model.pt",
+            mime="application/octet-stream"
+        )
+
+else:
+    st.info("👈 Configure parameters and click **▶ Start Training Engine**")
