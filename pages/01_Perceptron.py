@@ -1,10 +1,10 @@
-import time
 import numpy as np
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 from sklearn.datasets import make_moons, make_circles, make_blobs
 from sklearn.preprocessing import StandardScaler
+import io
 
 # ====================== PAGE CONFIG ======================
 st.set_page_config(
@@ -25,19 +25,15 @@ st.markdown("""
         font-weight: 700 !important;
         letter-spacing: -0.02em !important;
     }
-    .nn-card, .stPlotlyChart, .element-container {
-        border-radius: 12px !important;
-    }
     button[kind="primary"] {
         background: var(--accent) !important;
         color: #000 !important;
         font-weight: 700 !important;
     }
-    hr { border-color: var(--border) !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# ====================== HELPERS ======================
+# ====================== HELPER: DECISION BOUNDARY ======================
 def plot_decision_boundary(X, y, w, b, title="Decision Boundary"):
     x_min, x_max = X[:, 0].min() - 0.5, X[:, 0].max() + 0.5
     y_min, y_max = X[:, 1].min() - 0.5, X[:, 1].max() + 0.5
@@ -55,7 +51,6 @@ def plot_decision_boundary(X, y, w, b, title="Decision Boundary"):
                     labels={"x": "x₁", "y": "x₂"}, 
                     title=title)
    
-    # Overlay scatter points
     fig.add_scatter(x=X[:, 0], y=X[:, 1], mode="markers",
                     marker=dict(color=y.astype(int), 
                                 colorscale=["#f97316", "#00d4aa"], 
@@ -83,7 +78,6 @@ with st.sidebar:
 st.title("Perceptron")
 st.markdown("**Single-neuron linear classifier.** Adjust weights and watch the boundary move in real time.")
 
-# Hero banner
 st.markdown("""
 <div style="background: linear-gradient(90deg, #1a1f2e, #0f1626); padding: 1.8rem; border-radius: 12px; 
             border: 1px solid #00d4aa33; margin-bottom: 1.5rem;">
@@ -92,7 +86,6 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Theory
 with st.expander("📖 Theory", expanded=True):
     st.markdown("""
 The perceptron computes a **linear score** and applies a **step function**:
@@ -107,7 +100,7 @@ $$\\mathbf{w} \\leftarrow \\mathbf{w} + \\eta (y - \\hat{y})\\,\\mathbf{x}, \\qu
 
 st.markdown("---")
 
-# ====================== CONTROLS + VISUALIZATION ======================
+# ====================== CONTROLS ======================
 col1, col2 = st.columns([1, 2])
 
 with col1:
@@ -135,10 +128,10 @@ with col1:
     st.subheader("Training")
     lr = st.slider("Learning rate η", 0.01, 1.0, 0.1, 0.01)
     epochs = st.slider("Epochs", 1, 100, 20, 1)
-    uploaded_file = st.file_uploader("Upload your own 2D CSV (columns: x1, x2, label)", type=["csv"])
+    uploaded_file = st.file_uploader("Upload your own 2D CSV (x1, x2, label)", type=["csv"])
 
 with col2:
-    # Generate or load data
+    # Load data
     if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
         if df.shape[1] < 3:
@@ -160,17 +153,14 @@ with col2:
 
     w = np.array([w1, w2])
 
-    # Live boundary
+    # Live visualization
     fig_boundary = plot_decision_boundary(X, y, w, bias, "Live Decision Boundary")
     st.plotly_chart(fig_boundary, use_container_width=True)
 
-    # Data scatter
     scatter = px.scatter(
-        x=X[:, 0], y=X[:, 1], 
-        color=y.astype(str),
+        x=X[:, 0], y=X[:, 1], color=y.astype(str),
         color_discrete_sequence=["#f97316", "#00d4aa"],
         template="plotly_dark",
-        labels={"x": "Feature x₁", "y": "Feature x₂"},
         title="Data Points"
     )
     scatter.update_layout(height=280, paper_bgcolor="#161b22", plot_bgcolor="#0d1117")
@@ -182,7 +172,7 @@ st.subheader("Train Perceptron from Scratch")
 
 if st.button("▶ Train Perceptron", type="primary"):
     w_t = np.array([w1, w2], dtype=float)
-    b_t = bias
+    b_t = float(bias)
     history = []
 
     bar = st.progress(0)
@@ -211,23 +201,24 @@ if st.button("▶ Train Perceptron", type="primary"):
 
     st.success("✅ Training Complete!")
 
-    # Final boundary
     final_fig = plot_decision_boundary(X, y, w_t, b_t, "Trained Decision Boundary")
     st.plotly_chart(final_fig, use_container_width=True)
 
-    # History
-    with st.expander("📋 Training History (Weight Updates)"):
+    with st.expander("📋 Training History"):
         st.dataframe(pd.DataFrame(history), use_container_width=True)
 
-    # ====================== DOWNLOADS ======================
+    # ====================== DOWNLOADS (FIXED) ======================
     col_a, col_b = st.columns(2)
 
     with col_a:
-        # Fixed Pickle Download
-        model_dict = {"w": w_t, "b": b_t}
+        # Correct way to download pickle
+        model_bytes = io.BytesIO()
+        pd.to_pickle({"w": w_t, "b": b_t}, model_bytes)
+        model_bytes.seek(0)
+        
         st.download_button(
             label="⬇ Download Model (Pickle)",
-            data=pd.to_pickle(model_dict),   # This was the bug!
+            data=model_bytes,
             file_name="perceptron_model.pkl",
             mime="application/octet-stream"
         )
