@@ -6,7 +6,7 @@ from sklearn.preprocessing import StandardScaler
 
 # ====================== PAGE CONFIG ======================
 st.set_page_config(
-    page_title="NeuralForge • Noora",
+    page_title="NeuralForge • Shabnam",
     layout="wide",
     page_icon="⚡",
     initial_sidebar_state="collapsed"   # clean welcome page
@@ -309,7 +309,7 @@ st.markdown("""
         </div>
     </div>
     <div class="dev-info">
-        <span>👩‍💻 <strong style="color:#00d4aa;">Noora</strong> / Lead AI Engineer</span>
+        <span>👩‍💻 <strong style="color:#00d4aa;"></strong> / Lead AI Engineer</span>
         <span>🆔 <strong style="color:#f97316;">2302420002</strong></span>
         <span>⚡ 16 modules • 10+ datasets • RL • GAN • Transformers</span>
     </div>
@@ -411,7 +411,7 @@ with st.expander("▶ Quick Neural Playground – instant 3‑layer MLP", expand
 st.markdown("""
 <div style="text-align: center; margin-top: 3rem; padding: 1.5rem; border-top: 1px solid rgba(0,212,170,0.2);">
     <span style="color:#6c7a8e;">⚡ NeuralForge Ultra – Welcome Edition | Crafted by </span>
-    <strong style="color:#00d4aa;">Noora (2302420002)</strong>
+    <strong style="color:#00d4aa;"> (2302420002)</strong>
     <span style="color:#6c7a8e;"> • Use sidebar to navigate full toolset</span>
     <br><small style="color:#4a5568;">Immersive neural studio – 16 modules ready to deploy</small>
 </div>
@@ -419,5 +419,5 @@ st.markdown("""
 
 # Restore sidebar (collapsed by default but usable)
 st.sidebar.markdown("## 🧠 NeuralForge")
-st.sidebar.info("Welcome back, Noora. Select any module from the grid above to begin your neural engineering journey.")
-st.sidebar.markdown(f"**Developer:** Noora  \n**ID:** 2302420002  \n**Status:** Full access")
+st.sidebar.info("Welcome back, . Select any module from the grid above to begin your neural engineering journey.")
+st.sidebar.markdown(f"**Developer:** Shabnam  \n**ID:** 2302420002  \n**Status:** Full access")
