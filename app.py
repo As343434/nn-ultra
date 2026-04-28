@@ -6,365 +6,418 @@ from sklearn.preprocessing import StandardScaler
 
 # ====================== PAGE CONFIG ======================
 st.set_page_config(
-    page_title="NeuralForge Ultra",
+    page_title="NeuralForge • Noora",
     layout="wide",
-    page_icon="🧠",
-    initial_sidebar_state="expanded"
+    page_icon="⚡",
+    initial_sidebar_state="collapsed"   # clean welcome page
 )
 
-# ====================== FULL FIXED CSS ======================
+# ====================== FUTURISTIC CSS ======================
 st.markdown("""
 <style>
-    /* Core Theme */
-    section[data-testid="stSidebar"] {
-        background: var(--surface) !important;
-        border-right: 1px solid var(--border) !important;
+    @import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,500;14..32,700;14..32,800&family=Space+Mono&display=swap');
+    
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
     }
 
-    h1, h2, h3, h4 {
-        font-family: 'IBM Plex Sans', 'Helvetica Neue', sans-serif !important;
-        font-weight: 700 !important;
-        letter-spacing: -0.02em !important;
-        color: var(--text) !important;
+    .stApp {
+        background: radial-gradient(circle at 20% 30%, #05070a, #000000);
     }
 
-    /* Custom Cards */
-    .nn-card {
-        background: var(--surface) !important;
-        border: 1px solid var(--border) !important;
-        border-radius: 12px !important;
-        padding: 1.4rem !important;
-        margin-bottom: 1rem !important;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
-        transition: all 0.2s ease !important;
-    }
-    .nn-card:hover {
-        border-color: var(--accent) !important;
-        box-shadow: 0 0 20px rgba(0, 212, 170, 0.3) !important;
+    /* Hide default Streamlit elements */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+
+    /* Typography */
+    h1, h2, h3, h4, .stMarkdown {
+        font-family: 'Inter', 'Helvetica Neue', sans-serif !important;
     }
 
-    .nn-hero {
-        background: var(--surface) !important;
-        border: 1px solid var(--border) !important;
-        border-radius: 12px !important;
-        padding: 2.5rem 2rem !important;
-        margin-bottom: 1.6rem !important;
-        position: relative;
-        overflow: hidden;
+    /* Glow text effect */
+    .neon-glow {
+        text-shadow: 0 0 8px rgba(0, 212, 170, 0.6), 0 0 20px rgba(0, 212, 170, 0.3);
     }
 
-    .nn-pill {
+    /* Hero container */
+    .hero-wrapper {
+        background: linear-gradient(135deg, rgba(10, 20, 30, 0.7) 0%, rgba(0, 0, 0, 0.85) 100%);
+        backdrop-filter: blur(12px);
+        border-radius: 48px;
+        border: 1px solid rgba(0, 212, 170, 0.4);
+        padding: 2.5rem 3rem;
+        margin-bottom: 3rem;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.5), 0 0 30px rgba(0,212,170,0.2);
+    }
+
+    .badge {
         display: inline-block;
-        padding: 0.25rem 0.75rem;
-        border-radius: 9999px;
         background: rgba(0, 212, 170, 0.15);
-        color: var(--accent);
-        font-size: 0.75rem;
-        font-weight: 700;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-        margin-bottom: 0.6rem;
-    }
-    .nn-pill-orange { background: rgba(249, 115, 22, 0.15); color: #f97316; }
-    .nn-pill-purple { background: rgba(129, 140, 248, 0.15); color: #818cf8; }
-
-    .nn-metric {
-        background: var(--surface2) !important;
-        border: 1px solid var(--border) !important;
-        border-radius: 8px !important;
-        padding: 1rem 1.2rem !important;
-        text-align: center;
-        transition: box-shadow 0.2s !important;
-    }
-    .nn-metric:hover { box-shadow: 0 0 15px rgba(0, 212, 170, 0.4) !important; }
-
-    .nn-metric-value {
-        font-size: 1.8rem !important;
-        font-weight: 800 !important;
-        color: var(--accent) !important;
-        font-family: 'IBM Plex Sans', sans-serif !important;
-    }
-    .nn-metric-label {
-        font-size: 0.75rem !important;
-        color: var(--muted) !important;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        margin-top: 0.2rem !important;
-    }
-
-    /* Status Badges */
-    .status-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.4rem;
-        padding: 0.2rem 0.6rem;
-        border-radius: 9999px;
-        font-size: 0.72rem;
+        backdrop-filter: blur(4px);
+        border: 1px solid rgba(0, 212, 170, 0.5);
+        border-radius: 100px;
+        padding: 0.3rem 1rem;
+        font-size: 0.8rem;
         font-weight: 600;
-    }
-    .status-running { background: rgba(249, 115, 22, 0.2); color: #f97316; }
-    .status-done   { background: rgba(34, 197, 151, 0.2); color: #22c597; }
-    .status-idle   { background: rgba(148, 163, 184, 0.2); color: #94a3b8; }
-
-    /* Streamlit Component Overrides */
-    [data-testid="stMetric"] {
-        background: var(--surface) !important;
-        border: 1px solid var(--border) !important;
-        border-radius: 8px !important;
-        padding: 0.8rem 1rem !important;
-    }
-    [data-testid="stMetricValue"] {
-        color: var(--accent) !important;
+        letter-spacing: 0.05em;
+        color: #00d4aa;
+        text-transform: uppercase;
+        margin-bottom: 1.2rem;
     }
 
-    /* Expander Fix */
-    div[data-testid="stExpander"] > div {
-        background: var(--surface) !important;
-        border: 1px solid var(--border) !important;
-        border-radius: 8px !important;
+    .dev-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        background: rgba(0, 0, 0, 0.6);
+        border-radius: 24px;
+        padding: 0.8rem 1.8rem;
+        margin-top: 2rem;
+        border: 1px solid rgba(255,255,255,0.1);
+        font-family: 'Space Mono', monospace;
+    }
+
+    /* Card grid */
+    .module-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 1.5rem;
+        margin-top: 2rem;
+    }
+
+    .module-card {
+        background: rgba(18, 25, 35, 0.6);
+        backdrop-filter: blur(8px);
+        border-radius: 28px;
+        border: 1px solid rgba(0, 212, 170, 0.2);
+        padding: 1.5rem;
+        transition: all 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+        cursor: default;
+    }
+    .module-card:hover {
+        transform: translateY(-6px);
+        border-color: #00d4aa;
+        box-shadow: 0 0 25px rgba(0, 212, 170, 0.3);
+        background: rgba(18, 25, 45, 0.8);
+    }
+    .module-icon {
+        font-size: 2.2rem;
+        margin-bottom: 0.8rem;
+    }
+    .module-title {
+        font-weight: 800;
+        font-size: 1.3rem;
+        background: linear-gradient(135deg, #00d4aa, #818cf8);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        margin-bottom: 0.5rem;
+    }
+    .module-desc {
+        font-size: 0.85rem;
+        color: #9ca3af;
+        line-height: 1.4;
     }
 
     /* Buttons */
-    button[kind="primary"] {
-        background: var(--accent) !important;
-        color: #000 !important;
-        font-weight: 700 !important;
-        border-radius: 8px !important;
-        box-shadow: 0 0 12px rgba(0, 212, 170, 0.4) !important;
+    .launch-btn {
+        background: linear-gradient(90deg, #00d4aa, #0f6b5e);
+        border: none;
+        color: black;
+        font-weight: 700;
+        padding: 0.7rem 1.8rem;
+        border-radius: 40px;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: 0.2s;
+        box-shadow: 0 0 12px #00d4aa;
+        display: inline-block;
+        text-align: center;
     }
-    button[kind="secondary"] {
-        border: 1px solid var(--accent) !important;
-        color: var(--accent) !important;
-        border-radius: 8px !important;
-    }
-
-    [data-testid="stProgress"] > div > div {
-        background: var(--accent) !important;
+    .launch-btn:hover {
+        transform: scale(1.03);
+        box-shadow: 0 0 25px #00d4aa;
     }
 
     hr {
-        border-color: var(--border) !important;
-        margin: 1.8rem 0 !important;
+        border-color: rgba(0, 212, 170, 0.3);
+        margin: 2.5rem 0;
     }
-
-    /* Cyberpunk Scanlines - Safe version */
-    .cyber-scanlines::after {
-        content: '';
-        position: fixed;
-        top: 0; left: 0; right: 0; bottom: 0;
-        background: repeating-linear-gradient(
-            0deg,
-            transparent 0px,
-            transparent 2px,
-            rgba(0,0,0,0.05) 2px,
-            rgba(0,0,0,0.05) 4px
-        );
-        pointer-events: none;
-        z-index: 9999;
-        opacity: 0.7;
+    
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+        width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+        background: #0a0c10;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #00d4aa;
+        border-radius: 10px;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# ====================== HERO & METRIC HELPERS ======================
-def hero(title, subtitle, pill="v3.0 ULTRA"):
-    st.markdown(f"""
-    <div class="nn-hero">
-        <div style="display:flex; align-items:center; gap:0.8rem; margin-bottom:0.8rem;">
-            <span style="font-size:2.8rem;">🧠</span>
-            <h1 style="margin:0; font-size:2.4rem;">{title}</h1>
+# ====================== 3D NEURAL NETWORK (PURE ABSTRACT) ======================
+def create_rotating_neural_net():
+    """Glowing, abstract 3D neural network – no baby, pure cyberpunk style"""
+    # Generate layers with random offsets for organic look
+    np.random.seed(42)
+    n_layers = 5
+    nodes_per_layer = [5, 8, 12, 8, 4]
+    layer_positions = np.linspace(-3.2, 3.2, n_layers)
+    
+    all_nodes = []
+    layer_ranges = []
+    for i, (x, n_nodes) in enumerate(zip(layer_positions, nodes_per_layer)):
+        y_vals = np.linspace(-2.5, 2.5, n_nodes)
+        z_vals = np.random.uniform(-1.5, 1.5, n_nodes) * 0.8
+        layer_nodes = np.column_stack([np.full(n_nodes, x), y_vals, z_vals])
+        all_nodes.append(layer_nodes)
+        layer_ranges.append((len(all_nodes)-1, n_nodes))
+    
+    all_nodes = np.vstack(all_nodes)
+    
+    # Build edges between consecutive layers
+    edges = []
+    cumulative = 0
+    for i in range(n_layers - 1):
+        start_idx = cumulative
+        end_idx = cumulative + nodes_per_layer[i]
+        next_start = end_idx
+        next_end = next_start + nodes_per_layer[i+1]
+        for s in range(start_idx, end_idx):
+            for e in range(next_start, next_end):
+                # only connect if distance in y is reasonable
+                if abs(all_nodes[s,1] - all_nodes[e,1]) < 2.0:
+                    edges.append((all_nodes[s], all_nodes[e]))
+        cumulative += nodes_per_layer[i]
+    
+    # Create figure
+    fig = go.Figure()
+    
+    # Edges (glowing lines)
+    for (p1, p2) in edges:
+        fig.add_trace(go.Scatter3d(
+            x=[p1[0], p2[0]], y=[p1[1], p2[1]], z=[p1[2], p2[2]],
+            mode='lines',
+            line=dict(color='rgba(0, 212, 170, 0.5)', width=2),
+            hoverinfo='none',
+            showlegend=False
+        ))
+    
+    # Nodes (pulsing spheres)
+    fig.add_trace(go.Scatter3d(
+        x=all_nodes[:,0], y=all_nodes[:,1], z=all_nodes[:,2],
+        mode='markers',
+        marker=dict(
+            size=4,
+            color='#00d4aa',
+            opacity=0.9,
+            symbol='circle',
+            line=dict(width=1, color='white')
+        ),
+        name='Neurons'
+    ))
+    
+    # Additional floating particles for atmosphere
+    extra_particles = np.random.randn(150, 3) * 3.5
+    fig.add_trace(go.Scatter3d(
+        x=extra_particles[:,0], y=extra_particles[:,1], z=extra_particles[:,2],
+        mode='markers',
+        marker=dict(size=1.5, color='#818cf8', opacity=0.4),
+        showlegend=False
+    ))
+    
+    # Camera animation frames
+    n_frames = 60
+    frames = []
+    for i in range(n_frames):
+        angle = (i / n_frames) * 2 * np.pi
+        radius = 6.5
+        eye_x = radius * np.cos(angle)
+        eye_z = radius * np.sin(angle)
+        eye_y = 1.5 + 0.8 * np.sin(angle * 1.2)
+        frames.append(go.Frame(
+            layout=go.Layout(
+                scene=dict(
+                    camera=dict(
+                        eye=dict(x=eye_x, y=eye_y, z=eye_z),
+                        up=dict(x=0, y=1, z=0),
+                        center=dict(x=0, y=0, z=0)
+                    )
+                )
+            )
+        ))
+    
+    fig.update_layout(
+        updatemenus=[dict(
+            type="buttons",
+            showactive=False,
+            buttons=[
+                dict(label="▶ ROTATE",
+                     method="animate",
+                     args=[None, {"frame": {"duration": 70, "redraw": True},
+                                  "fromcurrent": True, "mode": "immediate",
+                                  "transition": {"duration": 0}}]),
+                dict(label="⏹ STOP",
+                     method="animate",
+                     args=[[None], {"frame": {"duration": 0, "redraw": False},
+                                    "mode": "immediate"}])
+            ],
+            direction="left",
+            pad={"r": 10, "t": 10},
+            x=0.02,
+            y=0.95,
+            font=dict(color="white", size=11)
+        )],
+        scene=dict(
+            xaxis=dict(visible=False, showticklabels=False, title=""),
+            yaxis=dict(visible=False, showticklabels=False, title=""),
+            zaxis=dict(visible=False, showticklabels=False, title=""),
+            aspectmode='cube',
+            bgcolor='rgba(0,0,0,0)',
+            camera=dict(eye=dict(x=5.2, y=2.0, z=3.8))
+        ),
+        margin=dict(l=0, r=0, t=0, b=0),
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        height=500,
+        showlegend=False
+    )
+    fig.frames = frames
+    return fig
+
+# ====================== MAIN WELCOME PAGE ======================
+# Hero Section
+st.markdown("""
+<div class="hero-wrapper">
+    <div class="badge">⚡ NEURAL ARCHITECTURE SUITE</div>
+    <h1 style="font-size: 4rem; font-weight: 800; margin-bottom: 0.5rem;">
+        <span class="neon-glow">NeuralForge</span>
+    </h1>
+    <p style="font-size: 1.3rem; color: #cbd5e1; max-width: 700px; margin-bottom: 2rem;">
+        Design, train, and experiment with 16 cutting‑edge neural modules — all in one immersive workspace.
+    </p>
+    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+        <div class="launch-btn" onclick="alert('Launching workspace... (sidebar ready)')">🚀 ENTER STUDIO</div>
+        <div style="background: rgba(255,255,255,0.05); border-radius: 40px; padding: 0.7rem 1.5rem; color: #94a3b8;">
+            🧠 v3.0 • 2302420002
         </div>
-        <span class="nn-pill">{pill}</span>
-        <p style="font-size:1.1rem; color:var(--muted); max-width:800px; line-height:1.6;">
-            {subtitle}
-        </p>
     </div>
-    """, unsafe_allow_html=True)
+    <div class="dev-info">
+        <span>👩‍💻 <strong style="color:#00d4aa;">Noora</strong> / Lead AI Engineer</span>
+        <span>🆔 <strong style="color:#f97316;">2302420002</strong></span>
+        <span>⚡ 16 modules • 10+ datasets • RL • GAN • Transformers</span>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
-def metric_row(items):
-    cols = st.columns(len(items))
-    for col, (label, value) in zip(cols, items):
-        with col:
-            st.markdown(f"""
-            <div class="nn-metric">
-                <div class="nn-metric-value">{value}</div>
-                <div class="nn-metric-label">{label}</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-# ====================== SIDEBAR ======================
-with st.sidebar:
-    st.title("🧠 NeuralForge")
-    st.markdown("### Navigation")
-    st.page_link("app.py", label="🏠 Home", icon="🏠")
-    # Add other page links here when you create them
-    st.markdown("---")
-    st.caption("NeuralForge Ultra v3.0")
-
-# ====================== MAIN CONTENT ======================
-st.title("NeuralForge Ultra")
-
-hero(
-    "NeuralForge Ultra",
-    "The most advanced interactive Neural Network Toolbox — 16 modules, 3 themes, AI-powered explanations, GAN Lab, RL Agent, Transformer Attention, and more.",
-    pill="v3.0 ULTRA"
-)
-
-metric_row([
-    ("Modules", "16"),
-    ("Architectures", "10"),
-    ("Optimizers", "5"),
-    ("Datasets", "10+"),
-    ("Themes", "3"),
-    ("AI Features", "∞"),
-])
+# 3D Neural Network Animation
+st.markdown("### 🧬 Neuro‑Dynamic Core")
+st.markdown("*Abstract 3D neural field – rotating, adaptive intelligence*")
+nn_fig = create_rotating_neural_net()
+st.plotly_chart(nn_fig, use_container_width=True)
 
 st.markdown("---")
+st.markdown("## ⚡ Full Arsenal")
+st.markdown("*Click any module to explore – every block is interactive*")
 
-# ====================== MODULE GRID ======================
-st.markdown("### 🗂️ Module Overview")
-
+# Module data
 modules = [
-    ("⬡", "Perceptron", "teal", "Single-neuron classifier with animated decision boundary, live weight updates, and data augmentation."),
-    ("⟶", "Forward Pass", "purple", "10 activation functions, step-by-step neuron math, derivative viewer with Taylor expansion."),
-    ("↺", "Backpropagation", "teal", "Chain-rule visualizer with live gradient flow, custom loss functions, and computation graph."),
-    ("↗", "Gradient Descent", "orange", "5 optimizers on 3D loss surfaces — saddle points, narrow valleys, noisy landscapes."),
-    ("⬛", "ANN / MLP", "teal", "Configurable MLP with NumPy/PyTorch backends, custom CSV upload, weight histograms, and early stopping."),
-    ("◫", "CNN", "purple", "Conv-net on MNIST/Fashion-MNIST — filter inspector, feature maps, class activation maps."),
-    ("⇌", "RNN / LSTM / GRU", "teal", "Sequence modeling lab with sine/stock/text prediction, attention overlay, and hidden-state heatmap."),
-    ("◎", "Autoencoder / VAE", "orange", "AE + VAE with 2D latent space, denoising mode, interpolation, and reconstruction gallery."),
-    ("◉", "OpenCV Vision", "teal", "15 preprocessing ops, pixel histogram, Fourier transform, and direct CNN pipeline feed."),
-    ("⚡", "Transformer Attn", "purple", "Multi-head attention visualizer, positional encoding explorer, and QKV decomposition."),
-    ("🎮", "GAN Lab", "orange", "Train a DCGAN in-browser — watch fake images evolve, mode collapse detector, loss dynamics."),
-    ("🤖", "RL Agent", "teal", "DQN agent on CartPole/GridWorld — reward curves, Q-value heatmap, policy visualization."),
-    ("🧬", "NAS Explorer", "purple", "Neural Architecture Search — compare architectures by params vs accuracy, efficiency frontier."),
-    ("📊", "Model Comparison", "orange", "Side-by-side benchmark: accuracy, params, inference time, memory — radar + bar charts."),
-    ("🧠", "AI Explainer", "teal", "Claude-powered explainer — ask ANY question about neural networks and get instant answers."),
-    ("📤", "Export Hub", "purple", "Export any model as PyTorch, ONNX, pickle, or Python script with one click."),
+    ("⬡", "Perceptron", "Single-neuron classifier • 2D boundary animation", "teal"),
+    ("⟶", "Forward Pass", "10 activations • Derivative viewer • Taylor series", "purple"),
+    ("↺", "Backpropagation", "Chain‑rule visualizer • Gradient flow", "teal"),
+    ("↗", "Gradient Descent", "5 optimizers • 3D loss landscapes", "orange"),
+    ("⬛", "ANN / MLP", "NumPy/PyTorch • CSV upload • Weight histograms", "teal"),
+    ("◫", "CNN", "MNIST/Fashion‑MNIST • Feature maps • CAM", "purple"),
+    ("⇌", "RNN / LSTM", "Sequence prediction • Attention overlay", "teal"),
+    ("◎", "Autoencoder / VAE", "Latent space interpolation • Denoising", "orange"),
+    ("◉", "OpenCV Vision", "15 preproc ops • Fourier • CNN pipeline", "teal"),
+    ("⚡", "Transformer Attn", "Multi‑head attention • QKV visualization", "purple"),
+    ("🎮", "GAN Lab", "Train DCGAN • Mode collapse detection", "orange"),
+    ("🤖", "RL Agent", "DQN on CartPole • Q‑value heatmaps", "teal"),
+    ("🧬", "NAS Explorer", "Architecture search • Efficiency frontier", "purple"),
+    ("📊", "Model Comparison", "Radar charts • Benchmarking", "orange"),
+    ("🧠", "AI Explainer", "Claude‑powered • Ask anything", "teal"),
+    ("📤", "Export Hub", "ONNX • PyTorch • Python script", "purple"),
 ]
 
+# Create grid with custom styling
 cols = st.columns(3)
-accent_map = {"teal": "#00d4aa", "orange": "#f97316", "purple": "#818cf8"}
-
-for i, (icon, name, color, desc) in enumerate(modules):
-    accent = accent_map[color]
-    with cols[i % 3]:
+for idx, (icon, name, desc, color) in enumerate(modules):
+    border_color = "#00d4aa" if color == "teal" else "#f97316" if color == "orange" else "#818cf8"
+    with cols[idx % 3]:
         st.markdown(f"""
-        <div class="nn-card" style="min-height: 138px;">
-            <div style="display:flex; align-items:center; gap:0.6rem; margin-bottom:0.6rem;">
-                <span style="font-size:1.45rem;">{icon}</span>
-                <span style="font-size:1rem; font-weight:700; color:{accent};">{name}</span>
-            </div>
-            <div style="font-size:0.83rem; color:var(--muted); line-height:1.55;">
-                {desc}
-            </div>
+        <div class="module-card" style="border-left: 4px solid {border_color};">
+            <div class="module-icon">{icon}</div>
+            <div class="module-title">{name}</div>
+            <div class="module-desc">{desc}</div>
         </div>
         """, unsafe_allow_html=True)
 
 st.markdown("---")
 
-# ====================== LIVE DEMO ======================
-st.markdown("### ⚡ Live Quick Demo — Train a 3-Layer MLP")
+# Optional: Quick demo teaser (compact)
+with st.expander("▶ Quick Neural Playground – instant 3‑layer MLP", expanded=False):
+    col_a, col_b = st.columns([1, 2])
+    with col_a:
+        lr = st.slider("LR", 0.001, 0.3, 0.03, key="welcome_lr")
+        epochs = st.slider("Epochs", 20, 200, 80, key="welcome_ep")
+        ds = st.selectbox("Dataset", ["moons", "circles"], key="welcome_ds")
+        if st.button("🔥 Train Demo", type="primary"):
+            # Simple training snippet (same logic as before, but shortened for demo)
+            # (showing only accuracy to keep it clean)
+            X, y = make_moons(n_samples=200, noise=0.1, random_state=42) if ds == "moons" else make_circles(n_samples=200, noise=0.07, factor=0.5, random_state=42)
+            X = StandardScaler().fit_transform(X)
+            y = y.astype(int)
+            h_dim = 12
+            W1 = np.random.randn(2, h_dim)*0.2
+            b1 = np.zeros(h_dim)
+            W2 = np.random.randn(h_dim, 2)*0.2
+            b2 = np.zeros(2)
+            acc_hist = []
+            for ep in range(epochs):
+                a1 = np.maximum(0, X@W1 + b1)
+                logits = a1@W2 + b2
+                exp = np.exp(logits - logits.max(1, keepdims=True))
+                probs = exp / exp.sum(1, keepdims=True)
+                pred = np.argmax(probs, axis=1)
+                acc = np.mean(pred == y)
+                acc_hist.append(acc)
+                # backward
+                y_onehot = np.eye(2)[y]
+                d_logits = (probs - y_onehot)/len(X)
+                dW2 = a1.T @ d_logits
+                db2 = d_logits.sum(0)
+                da1 = d_logits @ W2.T
+                da1[a1 <= 0] = 0
+                dW1 = X.T @ da1
+                db1 = da1.sum(0)
+                W1 -= lr * dW1
+                b1 -= lr * db1
+                W2 -= lr * dW2
+                b2 -= lr * db2
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(y=acc_hist, mode='lines', line=dict(color='#00d4aa', width=2)))
+            fig.update_layout(title="Accuracy over epochs", plot_bgcolor="#0d1117", paper_bgcolor="#0d1117", height=250, margin=dict(l=0,r=0))
+            st.plotly_chart(fig, use_container_width=True)
+            st.success(f"✅ Final accuracy: {acc_hist[-1]:.2%}")
 
-col1, col2 = st.columns([1, 2])
-
-with col1:
-    lr_demo = st.slider("Learning rate", 0.001, 0.5, 0.05, 0.001, key="home_lr")
-    ep_demo = st.slider("Epochs", 10, 300, 100, 10, key="home_ep")
-    h_demo = st.slider("Hidden size", 4, 64, 16, 4, key="home_h")
-    dataset = st.selectbox("Dataset", ["moons", "circles", "blobs"], key="home_ds")
-    run_demo = st.button("▶ Train", type="primary")
-
-with col2:
-    if run_demo:
-        np.random.seed(42)
-        if dataset == "moons":
-            X, y = make_moons(n_samples=200, noise=0.15, random_state=42)
-        elif dataset == "circles":
-            X, y = make_circles(n_samples=200, noise=0.1, factor=0.5, random_state=42)
-        else:
-            X, y = make_blobs(n_samples=200, centers=3, random_state=42)
-            y = (y > 0).astype(int)
-
-        X = StandardScaler().fit_transform(X)
-        n_classes = len(np.unique(y))
-
-        # Simple 3-layer MLP
-        W1 = np.random.randn(2, h_demo) * 0.3
-        b1 = np.zeros(h_demo)
-        W2 = np.random.randn(h_demo, h_demo) * 0.3
-        b2 = np.zeros(h_demo)
-        W3 = np.random.randn(h_demo, n_classes) * 0.3
-        b3 = np.zeros(n_classes)
-
-        losses, accs = [], []
-        bar = st.progress(0)
-        chart_ph = st.empty()
-
-        for ep in range(ep_demo):
-            # Forward
-            a1 = np.maximum(0, X @ W1 + b1)
-            a2 = np.maximum(0, a1 @ W2 + b2)
-            z3 = a2 @ W3 + b3
-            ex = np.exp(z3 - z3.max(1, keepdims=True))
-            probs = ex / ex.sum(1, keepdims=True)
-
-            # Loss & accuracy
-            yoh = np.eye(n_classes)[y]
-            loss = -np.mean(np.sum(yoh * np.log(probs + 1e-9), 1))
-            losses.append(loss)
-            preds = np.argmax(probs, axis=1)
-            accs.append(np.mean(preds == y))
-
-            # Backward
-            dz3 = (probs - yoh) / len(X)
-            dW3 = a2.T @ dz3
-            db3 = dz3.sum(0)
-            da2 = dz3 @ W3.T
-            da2[a1 @ W2 + b2 <= 0] = 0
-            dW2 = a1.T @ da2
-            db2 = da2.sum(0)
-            da1 = da2 @ W2.T
-            da1[X @ W1 + b1 <= 0] = 0
-            dW1 = X.T @ da1
-            db1 = da1.sum(0)
-
-            # Update
-            W1 -= lr_demo * dW1
-            b1 -= lr_demo * db1
-            W2 -= lr_demo * dW2
-            b2 -= lr_demo * db2
-            W3 -= lr_demo * dW3
-            b3 -= lr_demo * db3
-
-            bar.progress((ep + 1) / ep_demo)
-
-        # Plot
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(y=losses, mode="lines", name="Loss", line=dict(color="#00d4aa", width=2.5)))
-        fig.add_trace(go.Scatter(y=accs, mode="lines", name="Accuracy", line=dict(color="#f97316", width=2.5), yaxis="y2"))
-
-        fig.update_layout(
-            paper_bgcolor="#161b22", plot_bgcolor="#0d1117",
-            font=dict(color="#8b949e"), height=300,
-            margin=dict(l=10, r=10, t=20, b=10),
-            yaxis2=dict(overlaying="y", side="right", tickformat=".0%"),
-            legend=dict(bgcolor="rgba(0,0,0,0)"),
-        )
-        fig.update_xaxes(gridcolor="rgba(255,255,255,0.05)")
-        fig.update_yaxes(gridcolor="rgba(255,255,255,0.05)")
-
-        st.plotly_chart(fig, use_container_width=True)
-        st.success(f"✓ Final accuracy: **{accs[-1]:.1%}** | Final loss: **{losses[-1]:.4f}**")
-
-    else:
-        st.info("👈 Configure parameters on the left and click **▶ Train** to run the live demo.")
-
-st.markdown("---")
-
+# Footer
 st.markdown("""
-<div style="text-align:center; color:var(--muted); font-size:0.85rem; padding:2rem 0;">
-    🧠 NeuralForge Ultra v3.0 • Built with ❤️ using Streamlit, NumPy, Plotly & scikit-learn<br>
-    <span style="color:var(--accent)">Use the sidebar to explore all 16 interactive modules</span>
+<div style="text-align: center; margin-top: 3rem; padding: 1.5rem; border-top: 1px solid rgba(0,212,170,0.2);">
+    <span style="color:#6c7a8e;">⚡ NeuralForge Ultra – Welcome Edition | Crafted by </span>
+    <strong style="color:#00d4aa;">Noora (2302420002)</strong>
+    <span style="color:#6c7a8e;"> • Use sidebar to navigate full toolset</span>
+    <br><small style="color:#4a5568;">Immersive neural studio – 16 modules ready to deploy</small>
 </div>
 """, unsafe_allow_html=True)
+
+# Restore sidebar (collapsed by default but usable)
+st.sidebar.markdown("## 🧠 NeuralForge")
+st.sidebar.info("Welcome back, Noora. Select any module from the grid above to begin your neural engineering journey.")
+st.sidebar.markdown(f"**Developer:** Noora  \n**ID:** 2302420002  \n**Status:** Full access")
